@@ -334,3 +334,31 @@ ul{margin:0;padding:0;list-style:none}
 .connect-row{flex-wrap:wrap;gap:8px}
 .connect-row input{flex:1;min-width:200px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:inherit}
 .connect small{font-size:12px}
+.top{height:calc(64px + env(safe-area-inset-top));padding-top:env(safe-area-inset-top)}
+.side{padding-top:env(safe-area-inset-top)}
+.view{padding-bottom:calc(32px + env(safe-area-inset-bottom))}
+.toast{bottom:calc(24px + env(safe-area-inset-bottom));max-width:calc(100vw - 32px);width:max-content;text-align:center}
+@media (max-width:900px){
+  .cal{grid-template-columns:1fr;gap:8px}
+  .cal .d{min-height:0;flex-direction:row;flex-wrap:wrap;align-items:center;padding:10px 12px}
+  .cal .d > span{width:100%}
+  .cal .d:not(.has):not(.today){display:none}
+  .cal .d .ev{flex:1 1 100%}
+  .cal .d.today:not(.has)::after{content:"Rien de prévu aujourd’hui";font-size:13px;color:var(--mute)}
+}
+@media (max-width:640px){
+  input,select,textarea{font-size:16px!important}
+  .modal{padding:0;place-items:end stretch}
+  .modal .box,.modal .box.wide{width:100%;max-height:calc(100dvh - 24px);border-radius:20px 20px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom))}
+  .crm-t th:nth-child(3),.crm-t td:nth-child(3){display:none}
+  .frames{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .connect-top .av{display:none}
+  .connect-steps{margin-left:16px}
+  .head .btns{width:100%}
+  textarea[id^="msg-"]{min-height:140px!important}
+}
+.btn[data-a=chatSugg]{white-space:normal!important;height:auto!important;min-height:34px;text-align:left;line-height:1.35;padding:8px 12px!important;max-width:100%}
+@media (max-width:640px){
+  .crm-t th:nth-child(5),.crm-t td:nth-child(5),.crm-t th:nth-child(6),.crm-t td:nth-child(6){display:none}
+  .crm-t th,.crm-t td{padding-left:8px;padding-right:8px}
+}

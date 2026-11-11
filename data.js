@@ -48,6 +48,9 @@ function migrate(o) {
   out.interview = Object.assign({ step: 0, msgs: [], answers: {} }, o.interview || {});
   ['services', 'clients', 'quotes', 'done', 'weekly', 'calendar', 'perf', 'localMessages', 'memory', 'evolution', 'niaChat'].forEach(k => { if (!Array.isArray(out[k])) out[k] = []; });
   if (!Array.isArray(out.rules) || out.rules.length !== 4) out.rules = blankState().rules;
+  out.clients = out.clients.filter(c => c && c.id).map(c => Object.assign({ name: '', phone: '', email: '', source: 'Autre', status: 'prospect', notes: '', createdAt: iso(Date.now()), lastContact: c.createdAt || iso(Date.now()), next: '', history: [] }, c, { history: Array.isArray(c.history) ? c.history : [] }));
+  out.calendar = out.calendar.filter(e => e && e.id && e.date).map(e => Object.assign({ type: 'Story', angle: 'Offre', title: '', done: false }, e));
+  out.quotes = out.quotes.filter(q => q && q.id).map(q => Object.assign({ lines: [], discount: 0, status: 'brouillon' }, q));
   out.v = 2;
   return out;
 }

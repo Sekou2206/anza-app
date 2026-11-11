@@ -9,7 +9,7 @@ VIEWS.accueil = () => {
   const year = st.clients.reduce((a, c) => a + c.history.filter(h => new Date(h.date).getFullYear() === now.getFullYear()).reduce((x, h) => x + (+h.amount || 0), 0), 0);
   const pct = Math.min(100, Math.round(year / (p.threshold || 1) * 100));
   const nextDecl = p.period === 'trimestrielle' ? new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3 + 4, 0) : new Date(now.getFullYear(), now.getMonth() + 2, 0);
-  const upcoming = st.clients.filter(c => c.next && c.next >= iso(Date.now())).sort((a, b) => a.next.localeCompare(b.next)).slice(0, 4);
+  const upcoming = st.clients.filter(c => c.next && c.next >= iso(Date.now())).sort((a, b) => String(a.next).localeCompare(String(b.next))).slice(0, 4);
   const today = iso(Date.now()), tomorrow = iso(Date.now() + DAY);
   const posts = st.calendar.filter(e => (e.date === today || e.date === tomorrow) && !e.done);
   const diff = prev.v ? Math.round((cur.v - prev.v) / prev.v * 100) : null;
@@ -58,14 +58,14 @@ function weekIndex() { return Math.floor(mondayOf(Date.now()).getTime() / (7 * D
 VIEWS.crm = () => {
   if (!st.clients.length) return `<div class="head"><div><p class="kick">CRM</p><h1>Vos clients</h1><p>Tous vos contacts, du premier message au client fidèle.</p></div></div><div class="card empty-big"><h2>Ajoutez votre premier contact</h2><p class="mute">Un message Instagram, une demande WhatsApp, un ancien client : tout le monde a sa place ici. Anza vous dira ensuite qui relancer et quand.</p><button class="btn pri" data-a="newClient">${ic('plus')}Nouveau contact</button></div>`;
   const mode = route.q.vue || 'liste', f = route.q.f || 'tous';
-  const list = st.clients.filter(c => f === 'tous' || c.status === f).sort((a, b) => b.lastContact.localeCompare(a.lastContact));
+  const list = st.clients.filter(c => f === 'tous' || c.status === f).sort((a, b) => String(b.lastContact || '').localeCompare(String(a.lastContact || '')));
   const spent = c => c.history.reduce((a, h) => a + (+h.amount || 0), 0);
   const counts = s => st.clients.filter(c => c.status === s).length;
   return `<div class="head"><div><p class="kick">CRM</p><h1>Vos clients</h1><p>Tous vos contacts, du premier message au client fidèle.</p></div>
   <div class="btns"><div class="seg"><button class="${mode === 'liste' ? 'on' : ''}" data-a="go" data-h="#/crm?vue=liste&f=${f}">Liste</button><button class="${mode === 'pipeline' ? 'on' : ''}" data-a="go" data-h="#/crm?vue=pipeline">Pipeline</button></div><button class="btn pri" data-a="newClient">${ic('plus')}Nouveau contact</button></div></div>
   ${mode === 'pipeline' ? `<div class="kanban">${Object.keys(STATUS).map(s => `<div class="col" data-drop="${s}"><h4>${STATUS[s]} <span class="mute">${counts(s)}</span></h4>${st.clients.filter(c => c.status === s).map(c => `<div class="kc" draggable="true" data-drag="${c.id}"><b>${esc(c.name)}</b><small>${esc(c.source)} · ${fdate(c.lastContact)}</small><div class="row"><small>${eur(spent(c))}</small><a class="btn ghost sm" href="#/client/${c.id}">Ouvrir</a></div></div>`).join('')}</div>`).join('')}</div><p class="mute" style="margin-top:10px;font-size:13px">Glissez une carte pour changer son étape. Sur téléphone, changez l’étape depuis la fiche du contact.</p>` :
     `<div class="card" style="padding:0"><div style="padding:14px 16px"><div class="seg">${['tous', ...Object.keys(STATUS)].map(s => `<button class="${f === s ? 'on' : ''}" data-a="go" data-h="#/crm?vue=liste&f=${s}">${s === 'tous' ? 'Tous ' + st.clients.length : STATUS[s] + ' ' + counts(s)}</button>`).join('')}</div></div>
-    <div class="tablewrap"><table class="table"><thead><tr><th>Nom</th><th>Étape</th><th>Source</th><th>Dernier contact</th><th>Dépensé</th><th>Prochain rendez vous</th></tr></thead><tbody>
+    <div class="tablewrap"><table class="table crm-t"><thead><tr><th>Nom</th><th>Étape</th><th>Source</th><th>Dernier contact</th><th>Dépensé</th><th>Prochain rendez vous</th></tr></thead><tbody>
     ${list.map(c => `<tr class="click" data-a="go" data-h="#/client/${c.id}"><td><div class="row" style="flex-wrap:nowrap"><div class="av">${initials(c.name)}</div><b>${esc(c.name)}</b></div></td><td><span class="tag ${c.status}">${STATUS[c.status]}</span></td><td>${esc(c.source)}</td><td>${fdate(c.lastContact)}</td><td>${eur(spent(c))}</td><td>${c.next ? fdate(c.next) : '<span class="mute">Aucun</span>'}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">Aucun contact ici.</td></tr>'}
     </tbody></table></div></div>`}`;
 };
@@ -114,7 +114,7 @@ VIEWS.client = () => {
     <div class="card kpi"><p>Panier moyen</p><strong>${eur(visits ? spent / visits : 0)}</strong></div>
   </div>
   <div class="grid g21" style="margin-top:16px">
-    <div class="card"><h3>Historique</h3><ul class="list" style="margin-top:8px">${c.history.slice().sort((a, b) => b.date.localeCompare(a.date)).map(h => `<li><div class="grow"><b>${esc(h.text)}</b><small>${fdateL(h.date)}</small></div><b>${h.amount ? eur(h.amount) : ''}</b></li>`).join('') || '<li class="mute">Pas encore d’historique.</li>'}</ul>
+    <div class="card"><h3>Historique</h3><ul class="list" style="margin-top:8px">${c.history.slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))).map(h => `<li><div class="grow"><b>${esc(h.text)}</b><small>${fdateL(h.date)}</small></div><b>${h.amount ? eur(h.amount) : ''}</b></li>`).join('') || '<li class="mute">Pas encore d’historique.</li>'}</ul>
       ${qs.length ? `<h3 style="margin-top:20px">Devis</h3><ul class="list" style="margin-top:8px">${qs.map(q => `<li><div class="grow"><b>${esc(q.num)}</b><small>${fdate(q.date)}</small></div><span class="tag ${q.status}">${QSTATUS[q.status]}</span><b>${eur(quoteTotal(q))}</b><a class="btn ghost sm" href="#/devis/${q.id}">Ouvrir</a></li>`).join('')}</ul>` : ''}</div>
     <div class="grid" style="align-content:start">
       <div class="card"><h3>Coordonnées <button class="btn ghost sm" data-a="editClient" data-id="${c.id}">Modifier</button></h3><ul class="list" style="margin-top:8px"><li><small class="grow">Téléphone</small><b>${esc(c.phone) || '…'}</b></li><li><small class="grow">Email</small><b>${esc(c.email) || '…'}</b></li><li><small class="grow">Prochain rendez vous</small><input type="date" value="${c.next}" data-c="clientNext" data-id="${c.id}" style="border:1px solid var(--line);border-radius:8px;padding:5px 8px"></li></ul></div>
@@ -177,7 +177,7 @@ A.markDone = el => { finishFollow(el.dataset.id, el.dataset.r); toast('Relance m
 
 VIEWS.devis = () => {
   if (route.id) return quoteEditor();
-  const qs = st.quotes.slice().sort((a, b) => b.num.localeCompare(a.num));
+  const qs = st.quotes.slice().sort((a, b) => String(b.num || '').localeCompare(String(a.num || '')));
   const tot = s => qs.filter(q => q.status === s).reduce((a, q) => a + quoteTotal(q), 0);
   return `<div class="head"><div><p class="kick">Devis</p><h1>Vos devis</h1><p>Vos prestations et vos prix sont enregistrés : un devis propre en trente secondes, envoyé par WhatsApp ou email.</p></div><a class="btn pri" href="#/devis/new">${ic('plus')}Nouveau devis</a></div>
   <div class="grid g3"><div class="card kpi"><p>En attente</p><strong>${eur(tot('envoye'))}</strong></div><div class="card kpi"><p>Acceptés</p><strong>${eur(tot('accepte'))}</strong></div><div class="card kpi"><p>Taux d’acceptation</p><strong>${qs.length ? Math.round(qs.filter(q => q.status === 'accepte').length / Math.max(1, qs.filter(q => q.status !== 'brouillon').length) * 100) : 0} %</strong></div></div>
@@ -352,7 +352,7 @@ function applyAnswer(k, t) {
 VIEWS.bienvenue = () => {
   const e = +(route.q.e || 1), p = st.profile;
   const head = (n, t, d) => `<div class="onb-head"><div class="auth-logo">${LOGO}<span>anza</span></div><div class="onb-steps">${[1, 2, 3].map(i => `<i class="${i <= n ? 'on' : ''}"></i>`).join('')}</div><p class="kick">Étape ${n} sur 3</p><h1>${t}</h1><p class="mute">${d}</p></div>`;
-  const askKey = has(3) && !aiOn() && !st.aiLater && !(st.interview.msgs || []).some(m => m.f === 'u');
+  const askKey = ownKeyAllowed() && has(3) && !aiOn() && !st.aiLater && !(st.interview.msgs || []).some(m => m.f === 'u');
   if (e === 1) return `<div class="onb">${head(1, `Bienvenue${p.first ? ' ' + esc(p.first) : ''} !`, askKey ? 'Avant de commencer, branchez Claude : c’est lui qui donnera à Nia toute son intelligence, dès la première question.' : 'Nia, votre brand manager, va vous poser quelques questions. Comptez une dizaine de minutes. Tout ce que vous direz servira à écrire vos contenus, vos devis et vos relances.')}<div class="card">${askKey ? connectBox('onb') : niaChat(true)}</div></div>`;
   if (e === 2) return `<div class="onb">${head(2, 'Vos prestations et vos prix', 'Ils servent pour vos devis, vos offres et votre landing page. Vous pourrez les modifier à tout moment.')}
     <div class="card"><div class="svc-list">${st.services.map((s, i) => `<div class="svc"><input value="${esc(s.name)}" data-i="set" data-path="services.${i}.name" aria-label="Prestation"><div class="eurin"><input type="number" step="0.5" min="0" value="${s.price}" data-i="set" data-num data-path="services.${i}.price" aria-label="Prix"><span>€</span></div><button class="x" data-a="svcDel" data-n="${i}" aria-label="Supprimer">×</button></div>`).join('') || '<p class="mute">Aucune prestation pour l’instant.</p>'}</div>
@@ -459,11 +459,22 @@ function showImages(imgs, base, ratio) {
   modal('Vos images', `<p class="mute" style="margin-bottom:14px">Format prêt pour Instagram et LinkedIn. Cliquez sur une image pour la télécharger.</p><div class="frames">${imgs.map((d, i) => `<a href="${d}" download="${base}-${i + 1}.png" data-keep="1" style="aspect-ratio:${ratio};border-radius:12px;overflow:hidden;display:block"><img src="${d}" alt="Image ${i + 1}" style="width:100%;height:100%;object-fit:cover"></a>`).join('')}</div><div class="btns" style="margin-top:16px;justify-content:flex-end"><button class="btn pri" data-a="dlAll">${ic('dl')}Tout télécharger</button></div>`, true);
 }
 A.dlAll = () => { const { imgs, base } = window._imgs; imgs.forEach((d, i) => setTimeout(() => download(`${base}-${i + 1}.png`, d), i * 350)); };
-function planModal(type, angle, title) {
-  window._plan = { type, angle, title };
-  modal('Planifier', `<div class="form"><div class="field"><label for="pl-t">Titre</label><input id="pl-t" value="${esc(title)}"></div><div class="field"><label for="pl-d">Date de publication</label><input id="pl-d" type="date" value="${nextFreeDate(Date.now() + DAY)}"></div><div class="btns" style="justify-content:flex-end"><button class="btn sec" data-a="close">Annuler</button><button class="btn pri" data-a="planSave">Ajouter au calendrier</button></div></div>`);
+function planModal(type, angle, title, pick) {
+  window._plan = { type, angle, title, pick: !!pick };
+  const kinds = [['Story', 'Story'], ['Carrousel', 'Carrousel Instagram'], ['LinkedIn', 'Post LinkedIn']];
+  const angles = Array.from(new Set([...STORY_TYPES, ...ANGLES]));
+  modal(pick ? 'Ajouter une publication' : 'Planifier', `<div class="form">${pick ? `<div class="grid g2"><div class="field"><label for="pl-k">Type</label><select id="pl-k">${kinds.map(([k, l]) => `<option value="${k}" ${k === type ? 'selected' : ''}>${l}</option>`).join('')}</select></div><div class="field"><label for="pl-a">Angle</label><select id="pl-a">${angles.map(a => `<option ${a === angle ? 'selected' : ''}>${a}</option>`).join('')}</select></div></div>` : ''}<div class="field"><label for="pl-t">${pick ? 'Sujet' : 'Titre'}</label><input id="pl-t" value="${esc(title)}" placeholder="${pick ? 'Par exemple : mes créneaux de la semaine' : ''}"></div><div class="field"><label for="pl-d">Date de publication</label><input id="pl-d" type="date" value="${nextFreeDate(Date.now() + DAY)}" min="${iso(Date.now())}"></div><div class="btns" style="justify-content:flex-end"><button class="btn sec" data-a="close">Annuler</button><button class="btn pri" data-a="planSave">Ajouter au calendrier</button></div></div>`);
 }
-A.planSave = () => { const p = window._plan; st.calendar.push({ id: uid(), date: val('pl-d'), type: p.type, angle: p.angle, title: val('pl-t'), done: false }); save(); closeModal(); toast('Ajouté au calendrier le ' + fdateL(val('pl-d'))); };
+A.planSave = () => {
+  const p = window._plan || {}, date = val('pl-d'), raw = val('pl-t').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { toast('Choisissez une date'); return; }
+  const type = p.pick ? val('pl-k') || 'Story' : p.type || 'Story', angle = p.pick ? val('pl-a') || 'Offre' : p.angle || 'Offre';
+  const label = type === 'LinkedIn' ? 'Post LinkedIn' : type;
+  const title = p.pick ? `${label}, ${raw || angle.toLowerCase()}` : (raw || `${label}, ${angle.toLowerCase()}`);
+  st.calendar.push({ id: uid(), date, type, angle, title, done: false });
+  save(); closeModal(); toast('Ajouté au calendrier le ' + fdateL(date));
+  if (route.name === 'calendrier' || route.name === 'accueil') refresh();
+};
 
 let pgen = null;
 VIEWS.posts = () => {
@@ -505,11 +516,11 @@ VIEWS.calendrier = () => {
   return `<div class="head"><div><p class="kick">Attirer</p><h1>Calendrier de publication</h1><p>Quatre semaines planifiées : quoi publier, quel jour, avec le contenu déjà prêt. Cliquez sur une publication pour l’ouvrir.</p></div>
   <div class="btns"><span class="tag fidele" style="font-size:13px;padding:8px 12px">${done} publiées</span><button class="btn sec" data-a="calAdd">${ic('plus')}Ajouter</button><button class="btn pri" data-a="calPlan">${ic('spark')}Planifier mes 4 semaines</button></div></div>
   <div class="cal">${['lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.', 'dim.'].map(d => `<div class="dh">${d}</div>`).join('')}
-  ${days.map(d => { const k = iso(d), ev = st.calendar.filter(e => e.date === k); return `<div class="d ${k === today ? 'today' : ''} ${k < today ? 'past' : ''} ${!ev.length && k < today ? 'pad' : ''}"><span>${DAYS[d.getDay()]} ${d.getDate()}</span>${ev.map(e => `<button class="ev ${e.type} ${e.done ? 'done' : ''}" data-a="calOpen" data-id="${e.id}">${esc(e.type === 'LinkedIn' ? 'LinkedIn' : e.type)} · ${esc(e.title.split(', ').slice(1).join(', ') || e.title)}</button>`).join('')}</div>`; }).join('')}</div>
+  ${days.map(d => { const k = iso(d), ev = st.calendar.filter(e => e.date === k); return `<div class="d ${k === today ? 'today' : ''} ${k < today ? 'past' : ''} ${!ev.length && k < today ? 'pad' : ''} ${ev.length ? 'has' : ''}"><span>${DAYS[d.getDay()]} ${d.getDate()}</span>${ev.map(e => `<button class="ev ${e.type} ${e.done ? 'done' : ''}" data-a="calOpen" data-id="${e.id}">${esc(e.type === 'LinkedIn' ? 'LinkedIn' : e.type)} · ${esc(e.title.split(', ').slice(1).join(', ') || e.title)}</button>`).join('')}</div>`; }).join('')}</div>
   <div class="row" style="margin-top:14px;gap:14px;font-size:13px">${[['Story', 'Story'], ['Carrousel', 'Carrousel'], ['LinkedIn', 'Post LinkedIn'], ['Bilan', 'Bilan du mois']].map(([k, l]) => `<span class="ev ${k}" style="width:auto">${l}</span>`).join('')}</div>`;
 };
 A.calPlan = () => { const n = planMonth(); save(); toast(n ? `${plural(n, 'publication planifiée', 'publications planifiées')}` : 'Vos 4 semaines sont déjà planifiées'); refresh(); };
-A.calAdd = () => planModal('Story', 'Offre', 'Story offre, créneaux de la semaine');
+A.calAdd = () => planModal('Story', 'Offre', '', true);
 A.calOpen = el => {
   const e = st.calendar.find(x => x.id === el.dataset.id); window._ev = e;
   const sj = encodeURIComponent(e.brief || ''), link = e.type === 'Story' ? `#/stories?type=${encodeURIComponent(STORY_TYPES.includes(e.angle) ? e.angle : 'Offre')}&subj=${sj}` : e.type === 'Bilan' ? '#/bilan' : `#/posts?angle=${encodeURIComponent(ANGLES.includes(e.angle) ? e.angle : 'Conseils')}&net=${e.type === 'LinkedIn' ? 'LinkedIn' : 'Instagram'}&subj=${sj}`;
@@ -724,7 +735,7 @@ VIEWS.reglages = () => {
   ${aiSettings()}${histCard()}`;
 };
 function aiSettings() {
-  const mode = aiMode(), own = !!localKey(), canKey = !ONLINE || has(3);
+  const mode = aiMode(), own = !!localKey(), canKey = ownKeyAllowed() && (!ONLINE || has(3));
   const status = mode === 'local' ? 'Nia est connectée à Claude avec votre propre clé. Elle est enregistrée uniquement sur cet appareil et les appels sont facturés sur votre compte Claude.'
     : mode === 'server' ? 'Nia est connectée à ' + AI_NAME + ' par le serveur sécurisé Anza.'
     : ONLINE ? (has(3) ? 'Connexion à ' + AI_NAME + ' en attente de configuration du serveur. Vous pouvez dès maintenant connecter votre propre compte Claude ci dessous.' : 'Nia connectée à ' + AI_NAME + ' est incluse dans le Magasin.')
@@ -739,6 +750,7 @@ function aiSettings() {
   ${keyBox}</div>`;
 }
 function connectBox(ctx) {
+  if (!ownKeyAllowed()) return `<div class="connect"><div class="connect-top"><div class="av nia">N</div><div><b>Nia sera bientôt connectée à ${AI_NAME}</b><p class="mute">L’équipe Anza finalise la connexion. En attendant, Nia utilise ses modèles intégrés.</p></div></div></div>`;
   const later = ctx === 'onb' ? '<button class="btn ghost sm" data-a="aiLater">Plus tard, commencer sans Claude</button>' : '';
   return `<div class="connect ${ctx === 'home' ? 'connect-home' : ''}"><div class="connect-top"><div class="av nia">N</div><div><b>Branchez Claude, le cerveau de Nia</b><p class="mute">Connectée à votre compte Claude, Nia mène un vrai entretien, rebondit sur chaque réponse, choisit vos questions de la semaine, écrit stories, posts, bios et relances, et répond à tout dans Parler à Nia.</p></div></div>
   <ol class="mute connect-steps"><li>Ouvrez <a href="https://platform.claude.com" target="_blank" rel="noopener">platform.claude.com</a> et connectez vous.</li><li>Dans Billing, ajoutez quelques euros de crédits.</li><li>Dans API Keys, créez une clé et collez la ici.</li></ol>

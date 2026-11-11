@@ -65,7 +65,7 @@ Puis **Settings > Pages > Deploy from branch > main**. Pour `app.anza.website` :
 
 Nia fonctionne sans IA grâce à ses modèles intégrés. Connectée à une IA, elle mène un vrai entretien, rebondit sur chaque réponse, choisit la question de la semaine, en tire des actions concrètes (profil, mémoire, publications planifiées), écrit stories, posts, relances, bios et landing page, et répond librement dans « Parler à Nia ».
 
-À faire seulement au premier client Magasin. D’ici là, laissez `aiServer: false` dans `config.js` : Nia utilise ses modèles intégrés, sans coût. Une fois la fonction et la clé en place, passez `aiServer: true` et publiez.
+À faire seulement au premier client Magasin. D’ici là, laissez `aiServer: false` dans `config.js` : Nia utilise ses modèles intégrés, sans coût. Une fois la fonction et la clé en place, passez `aiServer: true` et `allowOwnKey: false` et publiez : tous les clients Magasin utilisent alors votre clé, sans rien connecter. Avec `allowOwnKey: true`, chaque client Magasin peut brancher sa propre clé Claude depuis l’app.
 
 La clé de l’IA ne doit jamais être dans l’application : elle reste sur le serveur, dans la fonction `nia`.
 

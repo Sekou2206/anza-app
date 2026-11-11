@@ -5,8 +5,9 @@ const $ = (s, c = document) => c.querySelector(s);
 const $$ = (s, c = document) => [...c.querySelectorAll(s)];
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])); }
 function eur(n) { n = Math.round((+n || 0) * 100) / 100; return n.toLocaleString('fr-FR', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 }) + ' €'; }
-function fdate(d) { const x = new Date(d); return `${x.getDate()} ${MONTHS[x.getMonth()]}`; }
-function fdateL(d) { const x = new Date(d); return `${DAYS[x.getDay()]} ${x.getDate()} ${MONTHS[x.getMonth()]}`; }
+function toDate(d) { if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)) { const [y, m, j] = d.split('-').map(Number); return new Date(y, m - 1, j); } return new Date(d); }
+function fdate(d) { const x = toDate(d); return isNaN(x) ? '' : `${x.getDate()} ${MONTHS[x.getMonth()]}`; }
+function fdateL(d) { const x = toDate(d); return isNaN(x) ? '' : `${DAYS[x.getDay()]} ${x.getDate()} ${MONTHS[x.getMonth()]}`; }
 function since(d) { return Math.floor((Date.now() - new Date(d).getTime()) / DAY); }
 function initials(n) { return String(n || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase(); }
 function phoneIntl(p) { const d = String(p || '').replace(/\D/g, ''); return d.startsWith('0') ? '33' + d.slice(1) : d; }

@@ -1,7 +1,8 @@
 const AI_KEY_STORE = 'anza-claude-key';
 const AI_MODEL_LOCAL = 'claude-sonnet-5-5';
 function keyStore() { return AI_KEY_STORE + (ONLINE && user ? '-' + user.id : ''); }
-function localKey() { try { return localStorage.getItem(keyStore()) || ''; } catch (e) { return ''; } }
+function ownKeyAllowed() { return !ONLINE || CFG.allowOwnKey !== false; }
+function localKey() { if (!ownKeyAllowed()) return ''; try { return localStorage.getItem(keyStore()) || ''; } catch (e) { return ''; } }
 function aiMode() {
   if (ONLINE && user) { if (!has(3)) return ''; if (localKey()) return 'local'; return CFG.aiServer ? 'server' : ''; }
   return localKey() ? 'local' : '';
