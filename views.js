@@ -713,7 +713,7 @@ VIEWS.reglages = () => {
   <div class="card"><h3>Votre compte</h3><p class="mute" style="font-size:14px;margin-top:10px">${ONLINE && user ? `Connecté avec <b>${esc(user.email)}</b>.<br>` : 'Données enregistrées sur cet appareil.<br>'}Formule : <b>${PLAN_NAME[plan] || 'Le Stand'}</b></p>
     <div class="btns" style="margin-top:14px"><button class="btn sec sm" data-a="exportData">${ic('dl')}Exporter mes données</button><label class="btn sec sm" style="cursor:pointer">Importer<input type="file" accept="application/json" data-c="importData" hidden></label></div>
     <div class="btns" style="margin-top:8px"><button class="btn sec sm" data-a="logout">Se déconnecter</button><button class="btn danger sm" data-a="delAccount">Supprimer mon compte</button></div>
-    <p class="mute" style="font-size:12px;margin-top:12px"><a href="${CFG.privacyUrl}" target="_blank" rel="noopener">Confidentialité</a> · <a href="${CFG.legalUrl}" target="_blank" rel="noopener">Mentions légales</a> · <a href="mailto:${CFG.contactEmail}">${CFG.contactEmail}</a></p></div></div>
+    <p class="mute" style="font-size:12px;margin-top:12px"><a href="${CFG.privacyUrl}" target="_blank" rel="noopener">Confidentialité</a> · <a href="${CFG.termsUrl}" target="_blank" rel="noopener">Conditions</a> · <a href="${CFG.legalUrl}" target="_blank" rel="noopener">Mentions légales</a> · <a href="mailto:${CFG.contactEmail}">${CFG.contactEmail}</a></p></div></div>
   ${aiSettings()}${histCard()}`;
 };
 function aiSettings() {

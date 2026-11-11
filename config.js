@@ -8,5 +8,6 @@ window.ANZA_CONFIG = {
   contactEmail: 'contact@anza.website',
   privacyUrl: 'https://anza.website/confidentialite.html',
   legalUrl: 'https://anza.website/mentions-legales.html',
+  termsUrl: 'https://anza.website/conditions.html',
   plansUrl: 'https://anza.website/#formules'
 };

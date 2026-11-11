@@ -1,6 +1,6 @@
 const CFG = window.ANZA_CONFIG || {};
 const ONLINE = !!(CFG.supabaseUrl && CFG.supabaseAnonKey && window.supabase && window.supabase.createClient);
-let sb = null, user = null, plan = CFG.defaultPlan || 'stand', pushTimer = null, booted = false;
+let sb = null, user = null, plan = ONLINE ? 'attente' : (CFG.defaultPlan || 'stand'), pushTimer = null, booted = false;
 let syncState = 'ok';
 
 let base = null, remoteAt = null, dirty = false, pushing = null;
@@ -43,7 +43,7 @@ function merge3(b, l, r, key) {
 
 function cacheKey() { return 'anza-cache-' + (user ? user.id : 'local'); }
 function readCache() { try { const r = localStorage.getItem(cacheKey()); return r ? JSON.parse(r) : null; } catch (e) { return null; } }
-function writeCache() { try { localStorage.setItem(cacheKey(), JSON.stringify(ONLINE ? { data: st, base, remoteAt, dirty, at: Date.now() } : { data: st, at: Date.now() })); } catch (e) {} }
+function writeCache() { try { localStorage.setItem(cacheKey(), JSON.stringify(ONLINE ? { data: st, base, remoteAt, dirty, plan, at: Date.now() } : { data: st, at: Date.now() })); } catch (e) {} }
 
 function localHist() { try { return JSON.parse(localStorage.getItem(HIST_KEY)) || []; } catch (e) { return []; } }
 function localSnap(data, force) {
@@ -112,7 +112,6 @@ async function pullMerge() {
   const { data, error } = await sb.from('anza_state').select('data, plan, updated_at').eq('user_id', user.id).maybeSingle();
   if (error) throw error;
   if (!data) throw new Error('missing');
-  plan = data.plan || plan;
   const remote = data.data && Object.keys(data.data).length ? migrate(clone(data.data)) : null;
   if (remote) {
     st = dirty ? migrate(base ? merge3(base, st, remote) : st) : clone(remote);
@@ -130,7 +129,7 @@ async function loadRemote() {
     const { data, error } = await sb.from('anza_state').select('data, plan, updated_at').eq('user_id', user.id).maybeSingle();
     if (error) throw error;
     if (data) {
-      plan = data.plan || CFG.defaultPlan || 'stand';
+      plan = data.plan || 'attente';
       const remote = data.data && Object.keys(data.data).length ? migrate(clone(data.data)) : null;
       remoteAt = data.updated_at; base = remote;
       if (cache && cache.dirty && cache.data) {
@@ -147,7 +146,7 @@ async function loadRemote() {
     if (dirty) push(); else setSync('ok');
   } catch (e) {
     st = cache && cache.data ? migrate(cache.data) : fresh();
-    base = cache ? cache.base || null : null; remoteAt = cache ? cache.remoteAt || null : null; dirty = !!(cache && cache.dirty);
+    base = cache ? cache.base || null : null; remoteAt = cache ? cache.remoteAt || null : null; if (cache && cache.plan) plan = cache.plan; dirty = !!(cache && cache.dirty);
     setSync('offline');
   }
 }
@@ -169,6 +168,7 @@ async function checkRemote(silent) {
       if (JSON.stringify(st) !== before && booted) { refresh(); if (!silent) toast('Vos données ont été mises à jour depuis un autre appareil'); }
     }
     if (dirty) push();
+    checkPlan(true);
   } catch (e) {}
 }
 
@@ -219,7 +219,7 @@ function authView(mode, msg, err) {
     ${mode === 'signup' ? '<div class="field"><label for="a-first">Prénom</label><input id="a-first" autocomplete="given-name" required></div>' : ''}
     ${mode !== 'reset' ? '<div class="field"><label for="a-email">Email</label><input id="a-email" type="email" autocomplete="email" required></div>' : ''}
     ${mode === 'login' ? pw('a-pw', 'current-password') : ''}${mode === 'signup' || mode === 'reset' ? pw('a-pw', 'new-password') + '<small class="mute">8 caractères minimum.</small>' : ''}
-    ${mode === 'signup' ? `<label class="row auth-consent"><input type="checkbox" id="a-ok"><span>J’accepte les <a href="${CFG.legalUrl}" target="_blank" rel="noopener">conditions</a> et la <a href="${CFG.privacyUrl}" target="_blank" rel="noopener">politique de confidentialité</a>.</span></label>` : ''}
+    ${mode === 'signup' ? `<label class="row auth-consent"><input type="checkbox" id="a-ok"><span>J’accepte les <a href="${CFG.termsUrl || CFG.legalUrl}" target="_blank" rel="noopener">conditions</a> et la <a href="${CFG.privacyUrl}" target="_blank" rel="noopener">politique de confidentialité</a>.</span></label>` : ''}
     <button class="btn pri" type="submit" style="height:46px">${{ login: 'Se connecter', signup: 'Créer mon compte', forgot: 'Recevoir le lien', reset: 'Enregistrer' }[mode]}</button>
   </form>
   ${mode === 'login' ? '<button class="btn ghost" data-a="authMode" data-m="forgot">Mot de passe oublié ?</button>' : ''}
@@ -269,7 +269,49 @@ async function enterApp() {
   startApp();
 }
 
+let pendingTimer = null;
+function pendingView(msg) {
+  document.body.className = 'auth-on';
+  const first = (user && user.user_metadata && user.user_metadata.first_name) || '';
+  $('#auth').innerHTML = `<div class="auth-card">
+  <div class="auth-logo">${LOGO}<span>anza</span></div>
+  <h1>${first ? 'Bienvenue ' + esc(first) + ' !' : 'Bienvenue !'}</h1>
+  <p class="mute" style="font-size:15px;line-height:1.55">Votre compte est créé avec <b>${esc(user.email)}</b>. Il s’ouvre automatiquement sur la formule que vous avez choisie dès que votre commande est validée.</p>
+  ${msg ? `<div class="auth-msg">${msg}</div>` : ''}
+  <div class="btns" style="flex-direction:column;gap:10px">
+    <a class="btn pri" href="${CFG.calendly}" target="_blank" rel="noopener" style="height:46px;justify-content:center">Choisir ma formule</a>
+    <button class="btn sec" data-a="pendingCheck" style="height:46px">J’ai déjà commandé, vérifier</button>
+    <button class="btn ghost" data-a="pendingOut">Se déconnecter</button>
+  </div>
+  <p class="auth-foot">Une question ? <a href="mailto:${CFG.contactEmail}">${CFG.contactEmail}</a></p></div>`;
+  clearInterval(pendingTimer);
+  pendingTimer = setInterval(() => { if (document.visibilityState === 'visible') checkPlan(true); }, 30000);
+}
+
+async function fetchPlan() {
+  const { data, error } = await sb.from('anza_state').select('plan').eq('user_id', user.id).maybeSingle();
+  if (error) throw error;
+  return data ? data.plan : null;
+}
+
+async function checkPlan(quiet) {
+  if (!ONLINE || !user) return;
+  try {
+    const p = await fetchPlan();
+    if (!p || p === plan) { if (!quiet && plan === 'attente') pendingView('Votre commande n’est pas encore validée. Dès qu’elle l’est, votre espace s’ouvre tout seul ici.'); return; }
+    const before = plan; plan = p;
+    if (plan === 'attente') { booted = false; pendingView(); return; }
+    clearInterval(pendingTimer);
+    if (before === 'attente' || !booted) { startApp(); toast('Votre formule ' + PLAN_NAME[plan] + ' est active. Bienvenue !'); }
+    else { refresh(); toast('Votre formule est maintenant ' + PLAN_NAME[plan]); }
+  } catch (e) { if (!quiet) toast('Vérification impossible. Vérifiez votre connexion.'); }
+}
+A.pendingCheck = () => checkPlan(false);
+A.pendingOut = () => { clearInterval(pendingTimer); signOut(); };
+
 function startApp() {
+  if (ONLINE && plan === 'attente') { pendingView(); return; }
+  clearInterval(pendingTimer);
   document.body.className = '';
   booted = true;
   if (!st.onboarded && !/^#\/bienvenue/.test(location.hash)) location.hash = '#/bienvenue';
@@ -284,6 +326,7 @@ async function signOut() {
   }
   try { localStorage.removeItem(cacheKey()); } catch (e) {}
   if (ONLINE) await sb.auth.signOut();
+  clearInterval(pendingTimer); plan = 'attente';
   user = null; st = null; booted = false; base = null; remoteAt = null; dirty = false;
   if (ONLINE) authView('login', 'Vous êtes déconnecté.'); else location.reload();
 }

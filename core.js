@@ -15,9 +15,9 @@ function clientById(id) { return st.clients.find(c => c.id === id); }
 function quoteTotal(q) { const t = q.lines.reduce((a, l) => a + l.qty * l.price, 0); return t * (1 - (+q.discount || 0) / 100); }
 function plural(n, a, b) { return n + ' ' + (n > 1 ? b : a); }
 
-const PLAN = { stand: 1, boutique: 2, magasin: 3 };
+const PLAN = { attente: 0, stand: 1, boutique: 2, magasin: 3 };
 const PLAN_NAME = { stand: 'Le Stand', boutique: 'La Boutique', magasin: 'Le Magasin' };
-function has(level) { return (PLAN[plan] || 1) >= level; }
+function has(level) { return (plan in PLAN ? PLAN[plan] : 1) >= level; }
 
 const ICON = {
   home: '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/>',

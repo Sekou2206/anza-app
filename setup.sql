@@ -1,6 +1,6 @@
 create table if not exists public.anza_state (
   user_id uuid primary key references auth.users(id) on delete cascade,
-  plan text not null default 'stand' check (plan in ('stand', 'boutique', 'magasin')),
+  plan text not null default 'attente',
   data jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -32,8 +32,7 @@ drop policy if exists "state read own" on public.anza_state;
 drop policy if exists "state insert own" on public.anza_state;
 drop policy if exists "state update own" on public.anza_state;
 create policy "state read own" on public.anza_state for select to authenticated using (user_id = auth.uid());
-create policy "state insert own" on public.anza_state for insert to authenticated with check (user_id = auth.uid() and plan = 'stand');
-alter table public.anza_state alter column plan set default 'stand';
+create policy "state insert own" on public.anza_state for insert to authenticated with check (user_id = auth.uid() and plan = 'attente');
 create policy "state update own" on public.anza_state for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 revoke update on public.anza_state from authenticated, anon;
@@ -65,10 +64,48 @@ create index if not exists ai_usage_user_idx on public.ai_usage(user_id, created
 alter table public.ai_usage enable row level security;
 revoke all on public.ai_usage from anon, authenticated;
 
+create table if not exists public.plan_grants (
+  email text primary key check (email = lower(email)),
+  plan text not null check (plan in ('attente', 'stand', 'boutique', 'magasin')),
+  note text,
+  created_at timestamptz not null default now()
+);
+alter table public.plan_grants enable row level security;
+revoke all on public.plan_grants from anon, authenticated;
+
+alter table public.anza_state alter column plan set default 'attente';
+alter table public.anza_state drop constraint if exists anza_state_plan_check;
+alter table public.anza_state add constraint anza_state_plan_check check (plan in ('attente', 'stand', 'boutique', 'magasin'));
+
+create or replace function public.plan_grants_sync()
+returns trigger language plpgsql security definer set search_path = public, auth as $$
+begin
+  new.email := lower(trim(new.email));
+  update public.anza_state s set plan = new.plan
+  from auth.users u where u.id = s.user_id and lower(u.email) = new.email;
+  return new;
+end $$;
+
+drop trigger if exists plan_grants_sync on public.plan_grants;
+create trigger plan_grants_sync before insert or update on public.plan_grants
+for each row execute function public.plan_grants_sync();
+
+create or replace function public.give_plan(client_email text, new_plan text)
+returns text language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.plan_grants (email, plan) values (lower(trim(client_email)), new_plan)
+  on conflict (email) do update set plan = excluded.plan;
+  return lower(trim(client_email)) || ' : ' || new_plan;
+end $$;
+revoke all on function public.give_plan(text, text) from public, anon, authenticated;
+revoke all on function public.plan_grants_sync() from public, anon, authenticated;
+
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin
-  insert into public.anza_state (user_id) values (new.id) on conflict do nothing;
+  insert into public.anza_state (user_id, plan)
+  values (new.id, coalesce((select g.plan from public.plan_grants g where g.email = lower(new.email)), 'attente'))
+  on conflict do nothing;
   return new;
 end $$;
 

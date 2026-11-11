@@ -113,7 +113,11 @@ Le guide complet, étape par étape jusqu’à la livraison au client, est dans 
 
 ## 6. Gérer vos clients (Supabase > Table Editor)
 
-- **Changer la formule** : chaque nouveau compte démarre en `stand`. Après paiement, table `anza_state`, colonne `plan` : `boutique` ou `magasin`. Le client ne peut pas la modifier lui même.
+- **Donner sa formule à un client** (avant ou après qu’il crée son compte), dans le SQL Editor :
+
+      select give_plan('client@exemple.fr', 'boutique');
+
+  Formules : `stand`, `boutique`, `magasin`, ou `attente` pour couper l’accès. Ou Table Editor > `plan_grants` > Insert row (email, plan). Un compte créé sans formule reste sur un écran d’attente et s’ouvre tout seul, en 30 secondes au plus, dès que la formule est donnée. Le client ne peut pas la modifier lui même. Le client ne peut pas la modifier lui même.
 - **Vue d’ensemble** : la vue `clients_overview` liste les comptes, la formule, l’activité et la dernière activité.
 - **Répondre à un message** (Magasin) : table `messages`, nouvelle ligne avec le `user_id` du client, `from_team` = true et votre réponse dans `body`.
 - **Contenus préparés** (Magasin) : table `team_items` (`user_id`, `day`, `title`, `status` : `en_preparation`, `programme` ou `publie`).
