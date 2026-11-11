@@ -128,7 +128,8 @@ select s.user_id, u.email, s.plan,
        s.data->'profile'->>'business' as activite,
        s.data->'profile'->>'first' as prenom,
        jsonb_array_length(coalesce(s.data->'clients', '[]'::jsonb)) as nb_contacts,
-       s.updated_at as derniere_activite
+       s.updated_at as derniere_activite,
+       'AZ' || case when s.plan = 'magasin' then 'M' else 'B' end || upper(substr(replace(s.user_id::text, '-', ''), 1, 6)) as code_anza
 from public.anza_state s join auth.users u on u.id = s.user_id;
 revoke all on public.clients_overview from anon, authenticated;
 

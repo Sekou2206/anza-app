@@ -362,3 +362,10 @@ ul{margin:0;padding:0;list-style:none}
   .crm-t th:nth-child(5),.crm-t td:nth-child(5),.crm-t th:nth-child(6),.crm-t td:nth-child(6){display:none}
   .crm-t th,.crm-t td{padding-left:8px;padding-right:8px}
 }
+.offer-lp{border-color:#BFD0FF;background:linear-gradient(135deg,#F2F6FF,#fff)}
+.offer-in{display:flex;gap:18px;align-items:center;justify-content:space-between}
+.offer-in h3{font-size:17px;margin-top:4px}
+.offer-in p.mute{font-size:14px;line-height:1.5;margin-top:6px;max-width:560px}
+.offer-in small{display:block;margin-top:8px;font-size:12px}
+.offer-in .btn{flex:none}
+@media (max-width:640px){.offer-in{flex-direction:column;align-items:stretch}.offer-in .btn{justify-content:center}}

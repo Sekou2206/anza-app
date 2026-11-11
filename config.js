@@ -5,6 +5,7 @@ window.ANZA_CONFIG = {
   aiServer: false,
   allowOwnKey: true,
   defaultPlan: 'stand',
+  landingWhatsapp: '+33743631826',
   calendly: 'https://calendly.com/contact-anza/30min',
   contactEmail: 'contact@anza.website',
   privacyUrl: 'https://anza.website/confidentialite.html',

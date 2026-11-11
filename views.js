@@ -594,12 +594,29 @@ VIEWS.landing = () => {
   <div class="btns">${aiOn() ? `<button class="btn sec" data-a="lpAI" ${busy ? 'disabled' : ''}>${ic('spark')}${busy ? 'Nia écrit' : 'Écrire avec Nia'}</button>` : ''}<button class="btn sec" data-a="lpOpen">Ouvrir en grand</button><button class="btn pri" data-a="lpDl">${ic('dl')}Télécharger le fichier</button></div></div>
   <div class="grid g12"><div class="card"><div class="form"><div class="field"><label for="lp-h">Titre</label><input id="lp-h" value="${esc(lp.headline)}" data-i="lp" data-k="headline"></div><div class="field"><label for="lp-s">Sous titre</label><textarea id="lp-s" data-i="lp" data-k="sub">${esc(lp.sub)}</textarea></div><div class="field"><label for="lp-c">Bouton</label><input id="lp-c" value="${esc(lp.cta)}" data-i="lp" data-k="cta"></div>
   <div class="tip"><i>✓</i><div>Les prestations viennent de vos réglages, les couleurs de votre charte. Le bouton ouvre WhatsApp avec un message prêt.</div></div></div></div>
+  ${lpOfferCard()}
   <div class="lp-frame"><div class="lp-bar"><i></i><i></i><i></i><span>Aperçu de votre page</span></div><iframe id="lpf" title="Aperçu de la landing page" style="width:100%;height:620px;border:0;display:block"></iframe></div></div>`;
 };
 AFTER.landing = () => { const f = $('#lpf'); if (f) f.srcdoc = landingHTML(lp); if (aiOn() && has(2) && !busy && !(st.lp && st.lp.ai) && !autoTried.lp) { autoTried.lp = true; A.lpAI(); } };
 const autoTried = {};
 I.lp = el => { lp[el.dataset.k] = el.value; st.lp = Object.assign({}, lp); save(); clearTimeout(window._lpt); window._lpt = setTimeout(AFTER.landing, 250); };
 A.lpAI = async () => { if (busy) return; busy = true; refresh(); try { const r = await aiLanding(); lp = { headline: r.headline || lp.headline, sub: r.sub || lp.sub, cta: r.cta || lp.cta }; st.lp = Object.assign({ ai: true }, lp); save(); toast('Textes écrits par Nia avec Claude'); } catch (e) { toast(aiError(e)); } busy = false; refresh(); };
+function lpCode() {
+  const id = (ONLINE && user ? user.id : (st.localId || (st.localId = uid()))).replace(/[^a-z0-9]/gi, '').slice(0, 6).toUpperCase();
+  return 'AZ' + (plan === 'magasin' ? 'M' : 'B') + id;
+}
+function lpWaLink() {
+  let n = String(CFG.landingWhatsapp || '').replace(/\D/g, ''); if (/^0\d{9}$/.test(n)) n = '33' + n.slice(1); if (/^330\d{9}$/.test(n)) n = '33' + n.slice(3);
+  if (!n) return '';
+  const p = st.profile, f = PLAN_NAME[plan] || 'La Boutique';
+  const msg = `Bonjour SC Project ! Je suis client Anza, formule ${f}, et je souhaite ma landing page personnalisée offerte.\n\nActivité : ${p.business || 'à préciser'}${p.activity ? ', ' + p.activity : ''}${p.city ? ', ' + p.city : ''}\nEmail : ${(ONLINE && user && user.email) || p.email || 'à préciser'}\nCode Anza : ${lpCode()}`;
+  return `https://wa.me/${n}?text=${encodeURIComponent(msg)}`;
+}
+function lpOfferCard() {
+  const link = lpWaLink(); if (!link) return '';
+  return `<div class="card offer-lp" style="margin-top:16px"><div class="offer-in"><div><p class="kick">Offert dans votre formule</p><h3>Votre landing page sur mesure, créée par SC Project</h3><p class="mute">Envie d’aller plus loin que ce modèle ? L’équipe SC Project conçoit gratuitement votre page personnalisée, à votre image. Envoyez votre demande sur WhatsApp, le message est déjà prêt.</p>${st.lpAsked ? `<small class="mute">Demande envoyée le ${fdate(st.lpAsked)}, votre code : <b>${lpCode()}</b></small>` : ''}</div><a class="btn pri" href="${link}" target="_blank" rel="noopener" data-a="lpAsk" data-keep="1">${ic('wa')}Demander ma landing offerte</a></div></div>`;
+}
+A.lpAsk = () => { st.lpAsked = iso(Date.now()); save(); setTimeout(refresh, 400); };
 A.lpDl = () => download('index.html', landingHTML(lp), 'text/html');
 A.lpOpen = () => { const w = window.open('', '_blank'); if (w) { w.document.write(landingHTML(lp)); w.document.close(); } };
 
