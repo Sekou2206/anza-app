@@ -12,7 +12,7 @@ VIEWS.accueil = () => {
   const upcoming = st.clients.filter(c => c.next && c.next >= iso(Date.now())).sort((a, b) => String(a.next).localeCompare(String(b.next))).slice(0, 4);
   const today = iso(Date.now()), tomorrow = iso(Date.now() + DAY);
   const posts = st.calendar.filter(e => (e.date === today || e.date === tomorrow) && !e.done);
-  const dueTasks = (st.tasks || []).filter(k => k.col !== 'done' && k.due && k.due <= today).sort((a, b) => a.due.localeCompare(b.due)).slice(0, 4);
+  const dueTasks = (st.tasks || []).filter(k => !taskDone(k) && k.due && k.due <= today).sort((a, b) => a.due.localeCompare(b.due)).slice(0, 4);
   const diff = prev.v ? Math.round((cur.v - prev.v) / prev.v * 100) : null;
   const steps = [
     ['Faire l’entretien avec Nia', ivDone(), '#/nia'],
@@ -821,53 +821,92 @@ A.delAccount = () => confirmBox('Supprimer définitivement votre compte et toute
 window.addEventListener('hashchange', () => { if (!/^#\/devis\//.test(location.hash)) draft = null; if (st) render(); });
 boot();
 
-const TCOLS = { todo: 'À faire', doing: 'En cours', wait: 'En attente', done: 'Terminé' };
-function tasksLate() { const t = iso(Date.now()); return (st && st.tasks || []).filter(k => k.col !== 'done' && k.due && k.due <= t).length; }
+const TCOLS_DEFAULT = [{ id: 'todo', name: 'À faire' }, { id: 'doing', name: 'En cours' }, { id: 'wait', name: 'En attente' }, { id: 'done', name: 'Terminé', done: true }];
+function tcols() { if (!st.taskCols || !st.taskCols.length) st.taskCols = TCOLS_DEFAULT.map(x => Object.assign({}, x)); return st.taskCols; }
+function tcol(id) { return tcols().find(c => c.id === id); }
+function isDoneCol(id) { const c = tcol(id); return !!(c && c.done); }
+function taskDone(k) { return isDoneCol(k.col); }
+function tasksLate() { if (!st) return 0; const t = iso(Date.now()); return (st.tasks || []).filter(k => !taskDone(k) && k.due && k.due <= t).length; }
 function taskCard(k) {
-  const t = iso(Date.now()), c = k.clientId ? clientById(k.clientId) : null;
-  const late = k.col !== 'done' && k.due && k.due < t, today = k.col !== 'done' && k.due === t;
-  return `<div class="kc task ${k.prio === 'haute' ? 'hot' : ''} ${k.col === 'done' ? 'is-done' : ''}" data-drag="${k.id}" data-a="taskOpen" data-id="${k.id}" tabindex="0">
+  const t = iso(Date.now()), c = k.clientId ? clientById(k.clientId) : null, done = taskDone(k);
+  const late = !done && k.due && k.due < t, today = !done && k.due === t;
+  return `<div class="kc task ${k.prio === 'haute' ? 'hot' : ''} ${done ? 'is-done' : ''}" data-drag="${k.id}" data-a="taskOpen" data-id="${k.id}" tabindex="0">
     <b>${esc(k.title)}</b>${k.note ? `<small class="tnote">${esc(k.note)}</small>` : ''}
     <div class="tmeta">${k.prio === 'haute' ? '<span class="tag hot">Prioritaire</span>' : ''}${k.due ? `<span class="tag ${late ? 'late' : today ? 'today' : ''}">${late ? 'En retard, ' : today ? 'Aujourd’hui, ' : ''}${fdate(k.due)}</span>` : ''}${c ? `<span class="tag">${esc(firstName(c.name))}</span>` : ''}</div>
-    <div class="tmove">${Object.keys(TCOLS).map(s => s === k.col ? '' : `<button class="btn ghost sm" data-a="taskMove" data-id="${k.id}" data-col="${s}">${TCOLS[s]}</button>`).join('')}</div></div>`;
+    <div class="tmove">${tcols().filter(s => s.id !== k.col).map(s => `<button class="btn ghost sm" data-a="taskMove" data-id="${k.id}" data-col="${s.id}">${esc(s.name)}</button>`).join('')}</div></div>`;
 }
 VIEWS.tableau = () => {
-  const ts = st.tasks || [];
+  const ts = st.tasks || [], cols = tcols();
+  ts.forEach(k => { if (!tcol(k.col)) k.col = cols[0].id; });
   const n = s => ts.filter(k => k.col === s).length;
-  const order = (a, b) => (a.col === 'done' ? String(b.doneAt || '').localeCompare(String(a.doneAt || '')) : (b.prio === 'haute') - (a.prio === 'haute') || String(a.due || '9999').localeCompare(String(b.due || '9999')));
-  return `<div class="head"><div><p class="kick">Piloter</p><h1>Votre tableau</h1><p>Toutes vos tâches en un coup d’œil. Faites glisser une carte d’une colonne à l’autre${innerWidth < 900 ? ' (appui long sur téléphone)' : ''}, touchez la pour la modifier.</p></div>
-  <div class="btns">${n('done') ? '<button class="btn sec" data-a="taskClear">Archiver les terminées</button>' : ''}<button class="btn pri" data-a="taskNew">${ic('plus')}Nouvelle tâche</button></div></div>
+  const order = (a, b) => (taskDone(a) ? String(b.doneAt || '').localeCompare(String(a.doneAt || '')) : (b.prio === 'haute') - (a.prio === 'haute') || String(a.due || '9999').localeCompare(String(b.due || '9999')));
+  const anyDone = ts.some(taskDone);
+  return `<div class="head"><div><p class="kick">Vendre</p><h1>Votre tableau</h1><p>Toutes vos tâches en un coup d’œil. Faites glisser une carte d’une colonne à l’autre${innerWidth < 900 ? ' (appui long sur téléphone)' : ''}, touchez la pour la modifier. Créez vos propres colonnes : touchez un titre pour le renommer.</p></div>
+  <div class="btns">${anyDone ? '<button class="btn sec" data-a="taskClear">Archiver les terminées</button>' : ''}<button class="btn sec" data-a="colNew">${ic('plus')}Colonne</button><button class="btn pri" data-a="taskNew">${ic('plus')}Nouvelle tâche</button></div></div>
   ${ts.length ? '' : `<div class="card tip" style="margin-bottom:16px"><i>✓</i><div>Commencez par ce qui vous trotte dans la tête : préparer une offre, rappeler un client, commander du matériel. Une tâche par carte, avec une date si elle en a une.</div></div>`}
-  <div class="kanban tboard">${Object.keys(TCOLS).map(s => `<div class="col" data-drop="${s}"><h4>${TCOLS[s]} <span class="mute">${n(s)}</span></h4>
-    ${ts.filter(k => k.col === s).sort(order).map(taskCard).join('')}
-    ${s !== 'done' ? `<button class="tadd" data-a="taskNew" data-col="${s}">${ic('plus')}Ajouter</button>` : ''}</div>`).join('')}</div>`;
+  <div class="kanban tboard" style="--n:${cols.length + 1}">${cols.map(s => `<div class="col" data-drop="${s.id}"><h4><button class="coltitle" data-a="colEdit" data-id="${s.id}" title="Modifier la colonne">${esc(s.name)}${s.done ? ' <span class="tag ok">fin</span>' : ''}</button> <span class="mute">${n(s.id)}</span></h4>
+    ${ts.filter(k => k.col === s.id).sort(order).map(taskCard).join('')}
+    ${s.done ? '' : `<button class="tadd" data-a="taskNew" data-col="${s.id}">${ic('plus')}Ajouter</button>`}</div>`).join('')}
+    <button class="col colnew" data-a="colNew">${ic('plus')}Nouvelle colonne</button></div>`;
 };
 AFTER.tableau = () => dnd((id, col) => moveTask(id, col));
 function moveTask(id, col) {
-  const k = (st.tasks || []).find(x => x.id === id); if (!k || !TCOLS[col]) return;
-  k.col = col; k.doneAt = col === 'done' ? iso(Date.now()) : '';
-  save(); toast(col === 'done' ? 'Bravo, tâche terminée' : `Déplacée dans ${TCOLS[col]}`); refresh();
+  const k = (st.tasks || []).find(x => x.id === id), c = tcol(col); if (!k || !c) return;
+  k.col = col; k.doneAt = c.done ? iso(Date.now()) : '';
+  save(); toast(c.done ? 'Bravo, tâche terminée' : `Déplacée dans ${c.name}`); refresh();
 }
+function colForm(c) {
+  const cols = tcols(), i = c ? cols.indexOf(c) : -1, cnt = c ? (st.tasks || []).filter(k => k.col === c.id).length : 0;
+  return `<div class="form"><div class="field"><label for="c-name">Nom de la colonne</label><input id="c-name" value="${esc(c ? c.name : '')}" maxlength="40" placeholder="Par exemple : À valider par le client"></div>
+  <label class="row" style="flex-wrap:nowrap;align-items:flex-start"><input type="checkbox" id="c-done" ${c && c.done ? 'checked' : ''}> <span>Colonne de fin : les tâches posées ici comptent comme terminées et ne sont plus en retard</span></label>
+  ${c ? `<div class="btns"><button class="btn sec sm" data-a="colShift" data-id="${c.id}" data-d="-1" ${i <= 0 ? 'disabled' : ''}>Déplacer à gauche</button><button class="btn sec sm" data-a="colShift" data-id="${c.id}" data-d="1" ${i >= cols.length - 1 ? 'disabled' : ''}>Déplacer à droite</button></div>` : ''}
+  <div class="btns" style="justify-content:space-between">${c && cols.length > 1 ? `<button class="btn danger" data-a="colDel" data-id="${c.id}">Supprimer${cnt ? ' la colonne' : ''}</button>` : '<span></span>'}<div class="btns"><button class="btn sec" data-a="close">Annuler</button><button class="btn pri" data-a="colSave" data-id="${c ? c.id : ''}">Enregistrer</button></div></div>
+  ${c && cnt ? `<small class="mute">Si vous la supprimez, ses ${cnt} tâche${cnt > 1 ? 's' : ''} iront dans « ${esc(cols.find(x => x.id !== c.id).name)} ».</small>` : ''}</div>`;
+}
+A.colNew = () => { if (tcols().length >= 10) { toast('10 colonnes au maximum'); return; } modal('Nouvelle colonne', colForm(null)); };
+A.colEdit = el => { const c = tcol(el.dataset.id); if (c) modal('Modifier la colonne', colForm(c)); };
+A.colSave = el => {
+  const name = val('c-name').trim().slice(0, 40); if (!name) { toast('Donnez un nom à la colonne'); return; }
+  const done = $('#c-done').checked, cols = tcols();
+  let c = tcol(el.dataset.id);
+  if (!c) { c = { id: 'c' + uid() }; const last = cols.findIndex(x => x.done); if (last >= 0 && !done) cols.splice(last, 0, c); else cols.push(c); }
+  const wasDone = !!c.done; c.name = name; c.done = done;
+  if (wasDone !== done) (st.tasks || []).filter(k => k.col === c.id).forEach(k => { k.doneAt = done ? iso(Date.now()) : ''; });
+  save(); closeModal(); toast('Colonne enregistrée'); refresh();
+};
+A.colShift = el => {
+  const cols = tcols(), i = cols.findIndex(c => c.id === el.dataset.id), j = i + (+el.dataset.d);
+  if (i < 0 || j < 0 || j >= cols.length) return;
+  [cols[i], cols[j]] = [cols[j], cols[i]]; save(); refresh(); A.colEdit({ dataset: { id: el.dataset.id } });
+};
+A.colDel = el => {
+  const cols = tcols(), c = tcol(el.dataset.id); if (!c || cols.length < 2) return;
+  const to = cols.find(x => x.id !== c.id);
+  confirmBox(`Supprimer la colonne « ${esc(c.name)} » ?`, 'Supprimer', () => {
+    (st.tasks || []).filter(k => k.col === c.id).forEach(k => { k.col = to.id; k.doneAt = to.done ? iso(Date.now()) : ''; });
+    st.taskCols = cols.filter(x => x.id !== c.id); save(); toast('Colonne supprimée'); refresh();
+  });
+};
 function taskForm(k) {
   const opts = st.clients.slice().sort((a, b) => a.name.localeCompare(b.name)).map(c => `<option value="${c.id}" ${k.clientId === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
   return `<div class="form"><div class="field"><label for="t-title">Tâche</label><input id="t-title" value="${esc(k.title || '')}" placeholder="Par exemple : préparer l’offre de Noël"></div>
   <div class="field"><label for="t-note">Détails</label><textarea id="t-note" rows="3">${esc(k.note || '')}</textarea></div>
-  <div class="grid g2"><div class="field"><label for="t-due">Échéance</label><input id="t-due" type="date" value="${k.due || ''}"></div><div class="field"><label for="t-col">Colonne</label><select id="t-col">${Object.entries(TCOLS).map(([s, l]) => `<option value="${s}" ${k.col === s ? 'selected' : ''}>${l}</option>`).join('')}</select></div></div>
+  <div class="grid g2"><div class="field"><label for="t-due">Échéance</label><input id="t-due" type="date" value="${k.due || ''}"></div><div class="field"><label for="t-col">Colonne</label><select id="t-col">${tcols().map(s => `<option value="${s.id}" ${k.col === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></div></div>
   <div class="grid g2"><div class="field"><label for="t-client">Client lié</label><select id="t-client"><option value="">Aucun</option>${opts}</select></div><div class="field"><label for="t-prio">Priorité</label><select id="t-prio"><option value="normale">Normale</option><option value="haute" ${k.prio === 'haute' ? 'selected' : ''}>Prioritaire</option></select></div></div>
   <div class="btns" style="justify-content:space-between">${k.id ? `<button class="btn danger" data-a="taskDel" data-id="${k.id}">Supprimer</button>` : '<span></span>'}<div class="btns"><button class="btn sec" data-a="close">Annuler</button><button class="btn pri" data-a="taskSave" data-id="${k.id || ''}">Enregistrer</button></div></div></div>`;
 }
-A.taskNew = el => modal('Nouvelle tâche', taskForm({ col: (el && el.dataset.col) || 'todo', clientId: (el && el.dataset.client) || '' }));
+A.taskNew = el => modal('Nouvelle tâche', taskForm({ col: (el && el.dataset.col) || (tcols().find(c => !c.done) || tcols()[0]).id, clientId: (el && el.dataset.client) || '' }));
 A.taskOpen = (el, e) => { if (Date.now() - dragAt < 400 || (e && e.target.closest('[data-a=taskMove]'))) return; const k = (st.tasks || []).find(x => x.id === el.dataset.id); if (k) modal('Modifier la tâche', taskForm(k)); };
 A.taskMove = el => moveTask(el.dataset.id, el.dataset.col);
 A.taskSave = el => {
   const title = val('t-title').trim(); if (!title) { toast('Donnez un nom à la tâche'); return; }
-  const data = { title: title.slice(0, 140), note: val('t-note').trim().slice(0, 1000), due: /^\d{4}-\d{2}-\d{2}$/.test(val('t-due')) ? val('t-due') : '', col: val('t-col') || 'todo', clientId: val('t-client'), prio: val('t-prio') || 'normale' };
+  const data = { title: title.slice(0, 140), note: val('t-note').trim().slice(0, 1000), due: /^\d{4}-\d{2}-\d{2}$/.test(val('t-due')) ? val('t-due') : '', col: tcol(val('t-col')) ? val('t-col') : tcols()[0].id, clientId: val('t-client'), prio: val('t-prio') || 'normale' };
   st.tasks = st.tasks || [];
   let k = st.tasks.find(x => x.id === el.dataset.id);
   if (!k) { k = { id: uid(), created: iso(Date.now()) }; st.tasks.push(k); }
-  if (data.col === 'done' && k.col !== 'done') data.doneAt = iso(Date.now());
-  if (data.col !== 'done') data.doneAt = '';
+  if (isDoneCol(data.col) && !isDoneCol(k.col)) data.doneAt = iso(Date.now());
+  if (!isDoneCol(data.col)) data.doneAt = '';
   Object.assign(k, data); save(); closeModal(); toast('Tâche enregistrée'); refresh();
 };
 A.taskDel = el => { st.tasks = (st.tasks || []).filter(x => x.id !== el.dataset.id); save(); closeModal(); toast('Tâche supprimée'); refresh(); };
-A.taskClear = () => confirmBox('Archiver toutes les tâches terminées ? Elles disparaîtront du tableau.', 'Archiver', () => { st.tasks = (st.tasks || []).filter(x => x.col !== 'done'); save(); refresh(); });
+A.taskClear = () => confirmBox('Archiver toutes les tâches terminées ? Elles disparaîtront du tableau.', 'Archiver', () => { st.tasks = (st.tasks || []).filter(x => !taskDone(x)); save(); refresh(); });

@@ -53,8 +53,8 @@ const ICON = {
 const ic = n => `<svg viewBox="0 0 24 24">${ICON[n]}</svg>`;
 
 const NAV = [
-  ['Piloter', [['accueil', 'Accueil', 'home'], ['tableau', 'Tableau', 'board', 'task']]],
-  ['Vendre', [['crm', 'Clients', 'users'], ['relances', 'Relances', 'bell', 'rel'], ['devis', 'Devis', 'file']]],
+  ['Piloter', [['accueil', 'Accueil', 'home']]],
+  ['Vendre', [['crm', 'Clients', 'users'], ['tableau', 'Tableau', 'board', 'task'], ['relances', 'Relances', 'bell', 'rel'], ['devis', 'Devis', 'file']]],
   ['Nia, brand manager', [['parler', 'Parler à Nia', 'msg', null, 3], ['nia', 'Entretien de départ', 'chat'], ['semaine', 'Question de la semaine', 'spark', 'week'], ['journal', 'Journal', 'book']]],
   ['Attirer', [['stories', 'Séquenceur de stories', 'story'], ['posts', 'Carrousels et posts', 'grid'], ['calendrier', 'Calendrier', 'cal'], ['bilan', 'Bilan du mois', 'chart'], ['charte', 'Charte et bio', 'palette'], ['landing', 'Landing page', 'page', null, 2]]],
   ['Magasin', [['ia', 'Mon IA personnelle', 'brain', null, 3], ['equipe', 'Accompagnement', 'team', null, 3]]],
