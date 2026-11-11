@@ -34,6 +34,7 @@ function blankState(first, email) {
     memory: [],
     evolution: [],
     niaChat: [],
+    tasks: [],
     focus: ''
   };
 }
@@ -46,7 +47,7 @@ function migrate(o) {
   out.brand = Object.assign(blankState().brand, o.brand || {});
   out.ai = Object.assign(blankState().ai, o.ai || {});
   out.interview = Object.assign({ step: 0, msgs: [], answers: {} }, o.interview || {});
-  ['services', 'clients', 'quotes', 'done', 'weekly', 'calendar', 'perf', 'localMessages', 'memory', 'evolution', 'niaChat'].forEach(k => { if (!Array.isArray(out[k])) out[k] = []; });
+  ['services', 'clients', 'quotes', 'done', 'weekly', 'calendar', 'perf', 'localMessages', 'memory', 'evolution', 'niaChat', 'tasks'].forEach(k => { if (!Array.isArray(out[k])) out[k] = []; });
   if (!Array.isArray(out.rules) || out.rules.length !== 4) out.rules = blankState().rules;
   out.clients = out.clients.filter(c => c && c.id).map(c => Object.assign({ name: '', phone: '', email: '', source: 'Autre', status: 'prospect', notes: '', createdAt: iso(Date.now()), lastContact: c.createdAt || iso(Date.now()), next: '', history: [] }, c, { history: Array.isArray(c.history) ? c.history : [] }));
   out.calendar = out.calendar.filter(e => e && e.id && e.date).map(e => Object.assign({ type: 'Story', angle: 'Offre', title: '', done: false }, e));

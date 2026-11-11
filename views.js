@@ -12,6 +12,7 @@ VIEWS.accueil = () => {
   const upcoming = st.clients.filter(c => c.next && c.next >= iso(Date.now())).sort((a, b) => String(a.next).localeCompare(String(b.next))).slice(0, 4);
   const today = iso(Date.now()), tomorrow = iso(Date.now() + DAY);
   const posts = st.calendar.filter(e => (e.date === today || e.date === tomorrow) && !e.done);
+  const dueTasks = (st.tasks || []).filter(k => k.col !== 'done' && k.due && k.due <= today).sort((a, b) => a.due.localeCompare(b.due)).slice(0, 4);
   const diff = prev.v ? Math.round((cur.v - prev.v) / prev.v * 100) : null;
   const steps = [
     ['Faire l’entretien avec Nia', ivDone(), '#/nia'],
@@ -42,7 +43,8 @@ VIEWS.accueil = () => {
     <div class="card"><h3>À faire aujourd’hui <a class="btn ghost sm" href="#/relances">Tout voir</a></h3>
       <ul class="list" style="margin-top:8px">${fol.slice(0, 4).map(f => `<li><div class="av">${initials(f.c.name)}</div><div class="grow"><b>${esc(f.c.name)}</b><small>${esc(f.label)}, ${plural(f.days, 'jour', 'jours')}</small></div><a class="btn sec sm" href="#/relances">Relancer</a></li>`).join('')}
       ${posts.map(e => `<li><div class="av" style="background:var(--blue)">${ic('story').replace('<svg', '<svg style="width:16px;height:16px;stroke:#fff;fill:none;stroke-width:2"')}</div><div class="grow"><b>${esc(e.title)}</b><small>${e.date === today ? 'À publier aujourd’hui' : 'Demain'}</small></div><a class="btn sec sm" href="#/calendrier">Voir</a></li>`).join('')}
-      ${!fol.length && !posts.length ? '<li class="mute">Rien d’urgent aujourd’hui.</li>' : ''}</ul></div>
+      ${dueTasks.map(k => `<li><div class="av" style="background:${k.due < today ? 'var(--bad)' : 'var(--navy)'}">${ic('board').replace('<svg', '<svg style="width:16px;height:16px;stroke:#fff;fill:none;stroke-width:2"')}</div><div class="grow"><b>${esc(k.title)}</b><small>${k.due < today ? 'En retard, prévue le ' + fdate(k.due) : 'Tâche du jour'}</small></div><a class="btn sec sm" href="#/tableau">Voir</a></li>`).join('')}
+      ${!fol.length && !posts.length && !dueTasks.length ? '<li class="mute">Rien d’urgent aujourd’hui.</li>' : ''}</ul></div>
   </div>
   <div class="grid g3" style="margin-top:16px">
     <div class="card"><h3>Prochains rendez vous</h3><ul class="list" style="margin-top:8px">${upcoming.map(c => `<li><div class="av">${initials(c.name)}</div><div class="grow"><b>${esc(c.name)}</b><small>${fdateL(c.next)}</small></div><a class="btn ghost sm" href="#/client/${c.id}">Fiche</a></li>`).join('') || '<li class="mute">Aucun rendez vous prévu. Ajoutez en un depuis la fiche d’un client.</li>'}</ul></div>
@@ -63,23 +65,16 @@ VIEWS.crm = () => {
   const counts = s => st.clients.filter(c => c.status === s).length;
   return `<div class="head"><div><p class="kick">CRM</p><h1>Vos clients</h1><p>Tous vos contacts, du premier message au client fidèle.</p></div>
   <div class="btns"><div class="seg"><button class="${mode === 'liste' ? 'on' : ''}" data-a="go" data-h="#/crm?vue=liste&f=${f}">Liste</button><button class="${mode === 'pipeline' ? 'on' : ''}" data-a="go" data-h="#/crm?vue=pipeline">Pipeline</button></div><button class="btn pri" data-a="newClient">${ic('plus')}Nouveau contact</button></div></div>
-  ${mode === 'pipeline' ? `<div class="kanban">${Object.keys(STATUS).map(s => `<div class="col" data-drop="${s}"><h4>${STATUS[s]} <span class="mute">${counts(s)}</span></h4>${st.clients.filter(c => c.status === s).map(c => `<div class="kc" draggable="true" data-drag="${c.id}"><b>${esc(c.name)}</b><small>${esc(c.source)} · ${fdate(c.lastContact)}</small><div class="row"><small>${eur(spent(c))}</small><a class="btn ghost sm" href="#/client/${c.id}">Ouvrir</a></div></div>`).join('')}</div>`).join('')}</div><p class="mute" style="margin-top:10px;font-size:13px">Glissez une carte pour changer son étape. Sur téléphone, changez l’étape depuis la fiche du contact.</p>` :
+  ${mode === 'pipeline' ? `<div class="kanban">${Object.keys(STATUS).map(s => `<div class="col" data-drop="${s}"><h4>${STATUS[s]} <span class="mute">${counts(s)}</span></h4>${st.clients.filter(c => c.status === s).map(c => `<div class="kc" data-drag="${c.id}"><b>${esc(c.name)}</b><small>${esc(c.source)} · ${fdate(c.lastContact)}</small><div class="row"><small>${eur(spent(c))}</small><a class="btn ghost sm" href="#/client/${c.id}">Ouvrir</a></div></div>`).join('')}</div>`).join('')}</div><p class="mute" style="margin-top:10px;font-size:13px">Glissez une carte pour changer son étape. Sur téléphone, changez l’étape depuis la fiche du contact.</p>` :
     `<div class="card" style="padding:0"><div style="padding:14px 16px"><div class="seg">${['tous', ...Object.keys(STATUS)].map(s => `<button class="${f === s ? 'on' : ''}" data-a="go" data-h="#/crm?vue=liste&f=${s}">${s === 'tous' ? 'Tous ' + st.clients.length : STATUS[s] + ' ' + counts(s)}</button>`).join('')}</div></div>
     <div class="tablewrap"><table class="table crm-t"><thead><tr><th>Nom</th><th>Étape</th><th>Source</th><th>Dernier contact</th><th>Dépensé</th><th>Prochain rendez vous</th></tr></thead><tbody>
     ${list.map(c => `<tr class="click" data-a="go" data-h="#/client/${c.id}"><td><div class="row" style="flex-wrap:nowrap"><div class="av">${initials(c.name)}</div><b>${esc(c.name)}</b></div></td><td><span class="tag ${c.status}">${STATUS[c.status]}</span></td><td>${esc(c.source)}</td><td>${fdate(c.lastContact)}</td><td>${eur(spent(c))}</td><td>${c.next ? fdate(c.next) : '<span class="mute">Aucun</span>'}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">Aucun contact ici.</td></tr>'}
     </tbody></table></div></div>`}`;
 };
-AFTER.crm = () => {
-  $$('[data-drag]').forEach(k => k.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', k.dataset.drag); }));
-  $$('[data-drop]').forEach(col => {
-    col.addEventListener('dragover', e => { e.preventDefault(); col.classList.add('over'); });
-    col.addEventListener('dragleave', () => col.classList.remove('over'));
-    col.addEventListener('drop', e => {
-      e.preventDefault(); const c = clientById(e.dataTransfer.getData('text/plain')); if (!c) return;
-      c.status = col.dataset.drop; c.lastContact = iso(Date.now()); save(); toast(`${firstName(c.name)} : ${STATUS[c.status]}`); refresh();
-    });
-  });
-};
+AFTER.crm = () => dnd((id, s) => {
+  const c = clientById(id); if (!c) return;
+  c.status = s; c.lastContact = iso(Date.now()); save(); toast(`${firstName(c.name)} : ${STATUS[c.status]}`); refresh();
+});
 
 function clientForm(c) {
   c = c || { name: '', phone: '', email: '', source: 'Instagram', status: 'prospect', notes: '' };
@@ -107,7 +102,7 @@ VIEWS.client = () => {
   const spent = c.history.reduce((a, h) => a + (+h.amount || 0), 0), visits = c.history.filter(h => h.amount > 0).length;
   const qs = st.quotes.filter(q => q.clientId === c.id);
   return `<div class="head"><div class="row" style="gap:16px;flex-wrap:nowrap"><div class="av lg">${initials(c.name)}</div><div><p class="kick"><a href="#/crm" style="text-decoration:none">Clients</a></p><h1>${esc(c.name)}</h1><p><select data-c="clientStatus" data-id="${c.id}" class="tag ${c.status}" style="border:0;cursor:pointer">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${c.status === k ? 'selected' : ''}>${v}</option>`).join('')}</select> · ${esc(c.source)} · depuis le ${fdate(c.createdAt)}</p></div></div>
-  <div class="btns"><a class="btn sec" href="${wa(c.phone, `Bonjour ${firstName(c.name)}, `)}" target="_blank" rel="noopener">${ic('wa')}WhatsApp</a><a class="btn sec" href="mailto:${esc(c.email)}">${ic('mail')}Email</a><a class="btn sec" href="#/devis/new?client=${c.id}">${ic('file')}Devis</a><button class="btn pri" data-a="addVisit" data-id="${c.id}">${ic('plus')}Ajouter une prestation</button></div></div>
+  <div class="btns"><a class="btn sec" href="${wa(c.phone, `Bonjour ${firstName(c.name)}, `)}" target="_blank" rel="noopener">${ic('wa')}WhatsApp</a><a class="btn sec" href="mailto:${esc(c.email)}">${ic('mail')}Email</a><a class="btn sec" href="#/devis/new?client=${c.id}">${ic('file')}Devis</a><button class="btn sec" data-a="taskNew" data-client="${c.id}">${ic('board')}Tâche</button><button class="btn pri" data-a="addVisit" data-id="${c.id}">${ic('plus')}Ajouter une prestation</button></div></div>
   <div class="grid g3">
     <div class="card kpi"><p>Dépensé au total</p><strong>${eur(spent)}</strong></div>
     <div class="card kpi"><p>Visites</p><strong>${visits}</strong></div>
@@ -825,3 +820,54 @@ A.delAccount = () => confirmBox('Supprimer définitivement votre compte et toute
 
 window.addEventListener('hashchange', () => { if (!/^#\/devis\//.test(location.hash)) draft = null; if (st) render(); });
 boot();
+
+const TCOLS = { todo: 'À faire', doing: 'En cours', wait: 'En attente', done: 'Terminé' };
+function tasksLate() { const t = iso(Date.now()); return (st && st.tasks || []).filter(k => k.col !== 'done' && k.due && k.due <= t).length; }
+function taskCard(k) {
+  const t = iso(Date.now()), c = k.clientId ? clientById(k.clientId) : null;
+  const late = k.col !== 'done' && k.due && k.due < t, today = k.col !== 'done' && k.due === t;
+  return `<div class="kc task ${k.prio === 'haute' ? 'hot' : ''} ${k.col === 'done' ? 'is-done' : ''}" data-drag="${k.id}" data-a="taskOpen" data-id="${k.id}" tabindex="0">
+    <b>${esc(k.title)}</b>${k.note ? `<small class="tnote">${esc(k.note)}</small>` : ''}
+    <div class="tmeta">${k.prio === 'haute' ? '<span class="tag hot">Prioritaire</span>' : ''}${k.due ? `<span class="tag ${late ? 'late' : today ? 'today' : ''}">${late ? 'En retard, ' : today ? 'Aujourd’hui, ' : ''}${fdate(k.due)}</span>` : ''}${c ? `<span class="tag">${esc(firstName(c.name))}</span>` : ''}</div>
+    <div class="tmove">${Object.keys(TCOLS).map(s => s === k.col ? '' : `<button class="btn ghost sm" data-a="taskMove" data-id="${k.id}" data-col="${s}">${TCOLS[s]}</button>`).join('')}</div></div>`;
+}
+VIEWS.tableau = () => {
+  const ts = st.tasks || [];
+  const n = s => ts.filter(k => k.col === s).length;
+  const order = (a, b) => (a.col === 'done' ? String(b.doneAt || '').localeCompare(String(a.doneAt || '')) : (b.prio === 'haute') - (a.prio === 'haute') || String(a.due || '9999').localeCompare(String(b.due || '9999')));
+  return `<div class="head"><div><p class="kick">Piloter</p><h1>Votre tableau</h1><p>Toutes vos tâches en un coup d’œil. Faites glisser une carte d’une colonne à l’autre${innerWidth < 900 ? ' (appui long sur téléphone)' : ''}, touchez la pour la modifier.</p></div>
+  <div class="btns">${n('done') ? '<button class="btn sec" data-a="taskClear">Archiver les terminées</button>' : ''}<button class="btn pri" data-a="taskNew">${ic('plus')}Nouvelle tâche</button></div></div>
+  ${ts.length ? '' : `<div class="card tip" style="margin-bottom:16px"><i>✓</i><div>Commencez par ce qui vous trotte dans la tête : préparer une offre, rappeler un client, commander du matériel. Une tâche par carte, avec une date si elle en a une.</div></div>`}
+  <div class="kanban tboard">${Object.keys(TCOLS).map(s => `<div class="col" data-drop="${s}"><h4>${TCOLS[s]} <span class="mute">${n(s)}</span></h4>
+    ${ts.filter(k => k.col === s).sort(order).map(taskCard).join('')}
+    ${s !== 'done' ? `<button class="tadd" data-a="taskNew" data-col="${s}">${ic('plus')}Ajouter</button>` : ''}</div>`).join('')}</div>`;
+};
+AFTER.tableau = () => dnd((id, col) => moveTask(id, col));
+function moveTask(id, col) {
+  const k = (st.tasks || []).find(x => x.id === id); if (!k || !TCOLS[col]) return;
+  k.col = col; k.doneAt = col === 'done' ? iso(Date.now()) : '';
+  save(); toast(col === 'done' ? 'Bravo, tâche terminée' : `Déplacée dans ${TCOLS[col]}`); refresh();
+}
+function taskForm(k) {
+  const opts = st.clients.slice().sort((a, b) => a.name.localeCompare(b.name)).map(c => `<option value="${c.id}" ${k.clientId === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
+  return `<div class="form"><div class="field"><label for="t-title">Tâche</label><input id="t-title" value="${esc(k.title || '')}" placeholder="Par exemple : préparer l’offre de Noël"></div>
+  <div class="field"><label for="t-note">Détails</label><textarea id="t-note" rows="3">${esc(k.note || '')}</textarea></div>
+  <div class="grid g2"><div class="field"><label for="t-due">Échéance</label><input id="t-due" type="date" value="${k.due || ''}"></div><div class="field"><label for="t-col">Colonne</label><select id="t-col">${Object.entries(TCOLS).map(([s, l]) => `<option value="${s}" ${k.col === s ? 'selected' : ''}>${l}</option>`).join('')}</select></div></div>
+  <div class="grid g2"><div class="field"><label for="t-client">Client lié</label><select id="t-client"><option value="">Aucun</option>${opts}</select></div><div class="field"><label for="t-prio">Priorité</label><select id="t-prio"><option value="normale">Normale</option><option value="haute" ${k.prio === 'haute' ? 'selected' : ''}>Prioritaire</option></select></div></div>
+  <div class="btns" style="justify-content:space-between">${k.id ? `<button class="btn danger" data-a="taskDel" data-id="${k.id}">Supprimer</button>` : '<span></span>'}<div class="btns"><button class="btn sec" data-a="close">Annuler</button><button class="btn pri" data-a="taskSave" data-id="${k.id || ''}">Enregistrer</button></div></div></div>`;
+}
+A.taskNew = el => modal('Nouvelle tâche', taskForm({ col: (el && el.dataset.col) || 'todo', clientId: (el && el.dataset.client) || '' }));
+A.taskOpen = (el, e) => { if (Date.now() - dragAt < 400 || (e && e.target.closest('[data-a=taskMove]'))) return; const k = (st.tasks || []).find(x => x.id === el.dataset.id); if (k) modal('Modifier la tâche', taskForm(k)); };
+A.taskMove = el => moveTask(el.dataset.id, el.dataset.col);
+A.taskSave = el => {
+  const title = val('t-title').trim(); if (!title) { toast('Donnez un nom à la tâche'); return; }
+  const data = { title: title.slice(0, 140), note: val('t-note').trim().slice(0, 1000), due: /^\d{4}-\d{2}-\d{2}$/.test(val('t-due')) ? val('t-due') : '', col: val('t-col') || 'todo', clientId: val('t-client'), prio: val('t-prio') || 'normale' };
+  st.tasks = st.tasks || [];
+  let k = st.tasks.find(x => x.id === el.dataset.id);
+  if (!k) { k = { id: uid(), created: iso(Date.now()) }; st.tasks.push(k); }
+  if (data.col === 'done' && k.col !== 'done') data.doneAt = iso(Date.now());
+  if (data.col !== 'done') data.doneAt = '';
+  Object.assign(k, data); save(); closeModal(); toast('Tâche enregistrée'); refresh();
+};
+A.taskDel = el => { st.tasks = (st.tasks || []).filter(x => x.id !== el.dataset.id); save(); closeModal(); toast('Tâche supprimée'); refresh(); };
+A.taskClear = () => confirmBox('Archiver toutes les tâches terminées ? Elles disparaîtront du tableau.', 'Archiver', () => { st.tasks = (st.tasks || []).filter(x => x.col !== 'done'); save(); refresh(); });

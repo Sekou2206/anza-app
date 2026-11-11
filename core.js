@@ -21,6 +21,7 @@ const PLAN_NAME = { stand: 'Le Stand', boutique: 'La Boutique', magasin: 'Le Mag
 function has(level) { return (plan in PLAN ? PLAN[plan] : 1) >= level; }
 
 const ICON = {
+  board: '<rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="10" rx="1.5"/><rect x="17" y="4" width="4" height="13" rx="1.5"/>',
   home: '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/>',
   users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.3-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 010 6.8M21.5 20c-.5-2.6-1.9-4.3-3.8-5"/>',
   bell: '<path d="M6 16V11a6 6 0 1112 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 004 0"/>',
@@ -52,7 +53,7 @@ const ICON = {
 const ic = n => `<svg viewBox="0 0 24 24">${ICON[n]}</svg>`;
 
 const NAV = [
-  ['Piloter', [['accueil', 'Accueil', 'home']]],
+  ['Piloter', [['accueil', 'Accueil', 'home'], ['tableau', 'Tableau', 'board', 'task']]],
   ['Vendre', [['crm', 'Clients', 'users'], ['relances', 'Relances', 'bell', 'rel'], ['devis', 'Devis', 'file']]],
   ['Nia, brand manager', [['parler', 'Parler à Nia', 'msg', null, 3], ['nia', 'Entretien de départ', 'chat'], ['semaine', 'Question de la semaine', 'spark', 'week'], ['journal', 'Journal', 'book']]],
   ['Attirer', [['stories', 'Séquenceur de stories', 'story'], ['posts', 'Carrousels et posts', 'grid'], ['calendrier', 'Calendrier', 'cal'], ['bilan', 'Bilan du mois', 'chart'], ['charte', 'Charte et bio', 'palette'], ['landing', 'Landing page', 'page', null, 2]]],
@@ -77,7 +78,8 @@ function layout() {
   const rel = computeFollow().length;
   const navHTML = NAV.map(([g, items]) => `<div class="navg">${g ? `<p>${g}</p>` : ''}${items.map(([k, label, icon, badge, lvl]) => {
     const locked = lvl && !has(lvl);
-    const cnt = badge === 'rel' && rel ? `<span class="cnt">${rel}</span>` : badge === 'week' && !weeklyDone() ? '<span class="cnt">1</span>' : '';
+    const late = badge === 'task' ? tasksLate() : 0;
+    const cnt = badge === 'rel' && rel ? `<span class="cnt">${rel}</span>` : late ? `<span class="cnt">${late}</span>` : badge === 'week' && !weeklyDone() ? '<span class="cnt">1</span>' : '';
     const on = route.name === k || (k === 'crm' && route.name === 'client');
     return `<a href="#/${k}" class="${on ? 'on' : ''}"><i>${ic(icon)}</i>${label}${locked ? `<span class="lock">${lvl === 2 ? 'BOUTIQUE' : 'MAGASIN'}</span>` : cnt}</a>`;
   }).join('')}</div>`).join('');
@@ -203,3 +205,50 @@ I.search = el => {
 
 const STATUS = { prospect: 'Prospect', devis: 'Devis envoyé', client: 'Client', fidele: 'Fidèle' };
 const QSTATUS = { brouillon: 'Brouillon', envoye: 'Envoyé', accepte: 'Accepté', refuse: 'Refusé' };
+
+let dragAt = 0;
+function dnd(onDrop) {
+  $$('[data-drag]').forEach(card => {
+    let timer = null, start = null, ghost = null, over = null, active = false;
+    const box = card.closest('.kanban');
+    const place = (x, y) => {
+      ghost.style.transform = `translate(${x - ghost.offsetWidth / 2}px, ${y - 24}px) rotate(2deg)`;
+      ghost.style.visibility = 'hidden'; const el = document.elementFromPoint(x, y); ghost.style.visibility = '';
+      const col = el && el.closest('[data-drop]');
+      if (col !== over) { if (over) over.classList.remove('over'); over = col; if (over) over.classList.add('over'); }
+      if (box) { if (x < 48) box.scrollLeft -= 14; else if (x > innerWidth - 48) box.scrollLeft += 14; }
+    };
+    const begin = (x, y) => {
+      active = true; card.classList.add('dragging');
+      ghost = card.cloneNode(true); ghost.classList.add('drag-ghost'); ghost.style.width = card.offsetWidth + 'px';
+      document.body.appendChild(ghost); place(x, y);
+      if (navigator.vibrate) try { navigator.vibrate(12); } catch (e) {}
+    };
+    const stop = () => {
+      clearTimeout(timer); timer = null;
+      window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', cancel);
+      if (active) {
+        dragAt = Date.now(); ghost.remove(); card.classList.remove('dragging');
+        if (over) { over.classList.remove('over'); const from = card.closest('[data-drop]'); if (!from || from.dataset.drop !== over.dataset.drop) onDrop(card.dataset.drag, over.dataset.drop); }
+      }
+      active = false; over = null; start = null;
+    };
+    const mv = e => {
+      if (!start) return;
+      if (active) { e.preventDefault(); place(e.clientX, e.clientY); return; }
+      const d = Math.hypot(e.clientX - start.x, e.clientY - start.y);
+      if (start.mouse && d > 6) begin(e.clientX, e.clientY);
+      else if (!start.mouse && d > 10) stop();
+    };
+    const up = () => stop();
+    const cancel = () => { if (!active) stop(); };
+    card.addEventListener('pointerdown', e => {
+      if (e.button || e.target.closest('a,button,select,input,textarea')) return;
+      start = { x: e.clientX, y: e.clientY, mouse: e.pointerType === 'mouse' };
+      window.addEventListener('pointermove', mv, { passive: false }); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', cancel);
+      if (!start.mouse) timer = setTimeout(() => begin(start.x, start.y), 260);
+    });
+    card.addEventListener('touchmove', e => { if (active) e.preventDefault(); }, { passive: false });
+    card.addEventListener('contextmenu', e => { if (active || timer) e.preventDefault(); });
+  });
+}
