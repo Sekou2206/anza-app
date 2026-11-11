@@ -1,0 +1,53 @@
+const DAY = 86400000;
+const iso = d => { const x = new Date(d); return new Date(x.getTime() - x.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-3);
+
+function blankState(first, email) {
+  return {
+    v: 2,
+    onboarded: false,
+    profile: {
+      first: first || '', name: first || '', business: '', activity: '', city: '',
+      story: '', target: '', problem: '', value: '', proof: '',
+      tone: 'vous', vibe: '', limits: '',
+      instagram: '', linkedin: '', phone: '', email: email || '', siret: '', address: '',
+      vatNote: true, threshold: 77700, period: 'mensuelle', cta: 'Réserver'
+    },
+    brand: { primary: '#1E3A8A', accent: '#2563EB', soft: '#EEF2FA', ink: '#0A1020', font: 'Inter', emoji: true },
+    services: [],
+    clients: [],
+    quotes: [],
+    quoteSeq: 1,
+    rules: [
+      { id: 'prospect', label: 'Prospect sans réponse', days: 2, on: true },
+      { id: 'devis', label: 'Devis envoyé non accepté', days: 3, on: true },
+      { id: 'revoir', label: 'Client à recontacter', days: 30, on: true },
+      { id: 'avis', label: 'Client satisfait sans avis', days: 1, on: true }
+    ],
+    done: [],
+    interview: { step: 0, msgs: [], answers: {} },
+    weekly: [],
+    calendar: [],
+    ai: { warmth: 65, humor: 30, formal: 45, length: 50 },
+    perf: [],
+    localMessages: [],
+    memory: [],
+    evolution: [],
+    niaChat: [],
+    focus: ''
+  };
+}
+
+function migrate(o) {
+  const b = blankState();
+  if (!o || typeof o !== 'object') return b;
+  const out = Object.assign(b, o);
+  out.profile = Object.assign(blankState().profile, o.profile || {});
+  out.brand = Object.assign(blankState().brand, o.brand || {});
+  out.ai = Object.assign(blankState().ai, o.ai || {});
+  out.interview = Object.assign({ step: 0, msgs: [], answers: {} }, o.interview || {});
+  ['services', 'clients', 'quotes', 'done', 'weekly', 'calendar', 'perf', 'localMessages', 'memory', 'evolution', 'niaChat'].forEach(k => { if (!Array.isArray(out[k])) out[k] = []; });
+  if (!Array.isArray(out.rules) || out.rules.length !== 4) out.rules = blankState().rules;
+  out.v = 2;
+  return out;
+}
