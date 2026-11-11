@@ -334,7 +334,7 @@ async function signOut() {
 async function deleteAccount() {
   try {
     if (ONLINE) { const { error } = await sb.rpc('delete_my_account'); if (error) throw error; }
-    try { localStorage.removeItem(cacheKey()); } catch (e) {}
+    try { localStorage.removeItem(cacheKey()); localStorage.removeItem(keyStore()); } catch (e) {}
     if (ONLINE) { await sb.auth.signOut().catch(() => {}); user = null; st = null; authView('login', 'Votre compte et vos données ont été supprimés.'); }
     else location.reload();
   } catch (e) { toast('Suppression impossible pour le moment. Écrivez nous à ' + CFG.contactEmail); }

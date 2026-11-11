@@ -255,7 +255,7 @@ function summary() {
   const p = P();
   return `Voici votre positionnement : ${p.business}, ${lc(p.activity)}, ${p.city}. Pour ${lc(p.target)}. Votre promesse : ${lc(dot(p.value))} Votre preuve : ${lc(dot(p.proof))} Je m’en sers maintenant pour tous vos contenus, devis et relances.`;
 }
-function aiBadge() { return aiOn() ? '<span class="tag ai">Connectée à ' + AI_NAME + '</span>' : ''; }
+function aiBadge() { return aiOn() ? '<span class="tag ai">Connectée à ' + (aiMode() === 'local' ? 'Claude' : AI_NAME) + '</span>' : ''; }
 function niaChat(onb) {
   const iv = st.interview, msgs = interviewMsgs(), done = ivDone();
   const prog = iv.covered ? Math.max(iv.covered.length, iv.step) : iv.step;
@@ -717,14 +717,22 @@ VIEWS.reglages = () => {
   ${aiSettings()}${histCard()}`;
 };
 function aiSettings() {
-  const mode = aiMode();
-  const status = mode === 'server' ? 'Nia est connectée à ' + AI_NAME + ' par le serveur sécurisé Anza.' : mode === 'local' ? 'Nia est connectée à Claude avec votre clé, enregistrée uniquement sur cet appareil.' : ONLINE ? (has(3) ? 'Connexion à ' + AI_NAME + ' en attente de configuration du serveur.' : 'Nia connectée à ' + AI_NAME + ' est incluse dans le Magasin.') : 'Nia utilise les modèles intégrés. Ajoutez une clé Claude pour la connecter.';
-  return `<div class="card" style="margin-top:16px"><h3>Nia et ${AI_NAME} ${aiBadge()}</h3><p class="mute" style="font-size:14px;margin-top:8px">${status}</p>
-  ${ONLINE ? '' : `<div class="row" style="margin-top:14px;flex-wrap:wrap"><input id="ck" type="password" autocomplete="off" placeholder="${localKey() ? 'Clé enregistrée' : 'sk-ant-…'}" style="flex:1;min-width:220px;border:1px solid var(--line);border-radius:10px;padding:9px 12px" aria-label="Clé API Claude"><button class="btn pri sm" data-a="keySave">Enregistrer</button>${localKey() ? '<button class="btn sec sm" data-a="keyTest">Tester</button><button class="btn danger sm" data-a="keyDel">Retirer</button>' : ''}</div><small class="mute" style="display:block;margin-top:8px">Créez la clé sur platform.claude.com. Elle reste sur cet appareil et sert uniquement à appeler Claude. Pour plusieurs utilisateurs, utilisez le serveur sécurisé décrit dans le guide d’installation.</small>`}
-  ${mode === 'server' ? '<div class="btns" style="margin-top:12px"><button class="btn sec sm" data-a="keyTest">Tester la connexion</button></div>' : ''}</div>`;
+  const mode = aiMode(), own = !!localKey(), canKey = !ONLINE || has(3);
+  const status = mode === 'local' ? 'Nia est connectée à Claude avec votre propre clé. Elle est enregistrée uniquement sur cet appareil et les appels sont facturés sur votre compte Claude.'
+    : mode === 'server' ? 'Nia est connectée à ' + AI_NAME + ' par le serveur sécurisé Anza.'
+    : ONLINE ? (has(3) ? 'Connexion à ' + AI_NAME + ' en attente de configuration du serveur. Vous pouvez dès maintenant connecter votre propre compte Claude ci dessous.' : 'Nia connectée à ' + AI_NAME + ' est incluse dans le Magasin.')
+    : 'Nia utilise les modèles intégrés. Ajoutez une clé Claude pour la connecter.';
+  const keyBox = canKey ? `<div class="keybox" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--line)">
+    <b style="font-size:14px">Connecter mon propre compte Claude</b>
+    <ol class="mute" style="font-size:13px;line-height:1.6;margin:8px 0 0 18px"><li>Ouvrez <a href="https://platform.claude.com" target="_blank" rel="noopener">platform.claude.com</a> et connectez vous.</li><li>Ajoutez quelques euros de crédits dans Billing.</li><li>Dans API Keys, créez une clé et collez la ici.</li></ol>
+    <div class="row" style="margin-top:12px;flex-wrap:wrap"><input id="ck" type="password" autocomplete="off" placeholder="${own ? 'Clé enregistrée sur cet appareil' : 'sk-ant-…'}" style="flex:1;min-width:220px;border:1px solid var(--line);border-radius:10px;padding:9px 12px" aria-label="Clé API Claude"><button class="btn pri sm" data-a="keySave">${own ? 'Remplacer' : 'Enregistrer'}</button>${own ? '<button class="btn danger sm" data-a="keyDel">Retirer</button>' : ''}</div>
+    <small class="mute" style="display:block;margin-top:8px">Votre clé reste sur cet appareil, n’est jamais envoyée à Anza et sert uniquement à appeler Claude. Sur un autre appareil, collez la à nouveau. ${ONLINE && CFG.aiServer ? 'Retirez la pour revenir au serveur Anza.' : ''}</small></div>` : '';
+  return `<div class="card" style="margin-top:16px"><h3>Nia et ${mode === 'local' ? 'Claude' : AI_NAME} ${aiBadge()}</h3><p class="mute" style="font-size:14px;margin-top:8px">${status}</p>
+  ${mode ? '<div class="btns" style="margin-top:12px"><button class="btn sec sm" data-a="keyTest">Tester la connexion</button></div>' : ''}
+  ${keyBox}</div>`;
 }
-A.keySave = () => { const k = val('ck').trim(); if (!/^sk-ant-/.test(k)) { toast('Une clé Claude commence par sk-ant-'); return; } try { localStorage.setItem(AI_KEY_STORE, k); } catch (e) {} toast('Clé enregistrée sur cet appareil'); refresh(); };
-A.keyDel = () => { try { localStorage.removeItem(AI_KEY_STORE); } catch (e) {} toast('Clé retirée'); refresh(); };
+A.keySave = () => { const k = val('ck').trim(); if (!/^sk-ant-/.test(k)) { toast('Une clé Claude commence par sk-ant-'); return; } try { localStorage.setItem(keyStore(), k); } catch (e) {} toast('Clé enregistrée sur cet appareil'); refresh(); };
+A.keyDel = () => { try { localStorage.removeItem(keyStore()); } catch (e) {} toast('Clé retirée'); refresh(); };
 A.keyTest = async el => { const lbl = el.textContent; el.disabled = true; el.textContent = 'Test en cours'; try { const r = await aiWeeklyQuestion(); toast('Connexion réussie. Nia demande : ' + r.question); } catch (e) { toast(aiError(e)); } el.disabled = false; el.textContent = lbl; };
 function histCard() {
   return `<div class="card" style="margin-top:16px"><h3>Versions précédentes</h3><p class="mute" style="font-size:14px;margin-top:8px">Anza garde automatiquement les ${HIST_MAX} dernières versions de vos données, au plus une par heure d’activité. En cas d’erreur ou de suppression par mégarde, revenez à une version : l’état actuel est gardé lui aussi.</p><div id="hist" style="margin-top:12px"><button class="btn sec sm" data-a="histLoad">Voir les versions</button></div></div>`;

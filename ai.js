@@ -1,7 +1,11 @@
 const AI_KEY_STORE = 'anza-claude-key';
 const AI_MODEL_LOCAL = 'claude-sonnet-5-5';
-function localKey() { try { return localStorage.getItem(AI_KEY_STORE) || ''; } catch (e) { return ''; } }
-function aiMode() { if (ONLINE && user) return has(3) && CFG.aiServer ? 'server' : ''; return localKey() ? 'local' : ''; }
+function keyStore() { return AI_KEY_STORE + (ONLINE && user ? '-' + user.id : ''); }
+function localKey() { try { return localStorage.getItem(keyStore()) || ''; } catch (e) { return ''; } }
+function aiMode() {
+  if (ONLINE && user) { if (!has(3)) return ''; if (localKey()) return 'local'; return CFG.aiServer ? 'server' : ''; }
+  return localKey() ? 'local' : '';
+}
 function aiOn() { return !!aiMode(); }
 
 const NIA_SYSTEM = `Tu es Nia, la brand manager d’Anza, un outil créé par SAUTI et SC Project pour les entrepreneurs qui débutent. Tu es une intelligence artificielle formée à la méthode SAUTI : diagnostic, message et voix, construction, production et diffusion, mesure, conversion.
