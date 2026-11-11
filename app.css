@@ -325,3 +325,12 @@ ul{margin:0;padding:0;list-style:none}
 .hist-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
 .hist-row b{display:block;font-size:14px}.hist-row b::first-letter{text-transform:uppercase}
 .hist-row small{display:block;font-size:12px;margin-top:2px}
+.connect{display:flex;flex-direction:column;gap:12px}
+.connect-top{display:flex;gap:12px;align-items:flex-start}
+.connect-top b{font-size:16px;letter-spacing:-.01em}
+.connect-top p{font-size:14px;line-height:1.5;margin-top:4px}
+.connect-steps{font-size:13px;line-height:1.7;margin-left:18px}
+.connect-steps a{color:inherit;text-decoration:underline}
+.connect-row{flex-wrap:wrap;gap:8px}
+.connect-row input{flex:1;min-width:200px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:inherit}
+.connect small{font-size:12px}

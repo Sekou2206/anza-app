@@ -25,6 +25,7 @@ VIEWS.accueil = () => {
   return `
   <div class="head"><div><p class="kick">${fdateL(now)}</p><h1>Bonjour ${esc(p.first || '')}</h1><p>${st.clients.length ? `Voici votre activité aujourd’hui. ${fol.length ? `${plural(fol.length, 'relance vous attend', 'relances vous attendent')}.` : 'Aucune relance en attente.'}` : 'Bienvenue dans votre espace Anza. Suivez les étapes ci dessous pour bien démarrer.'}</p></div>
   <div class="btns"><a class="btn sec" href="#/devis/new">${ic('file')}Nouveau devis</a><button class="btn pri" data-a="newClient">${ic('plus')}Nouveau contact</button></div></div>
+  ${has(3) && !aiOn() ? `<div class="card" style="margin-bottom:16px">${connectBox('home')}</div>` : ''}
   ${left ? `<div class="card" style="margin-bottom:16px"><h3>Bien démarrer <small>${steps.length - left} sur ${steps.length}</small></h3><div class="meter"><i style="width:${(steps.length - left) / steps.length * 100}%"></i></div>
   <ul class="checklist">${steps.map(([t, ok, h]) => `<li class="${ok ? 'ok' : ''}"><span class="ck">${ok ? ic('check') : ''}</span><a href="${h}">${t}</a></li>`).join('')}</ul></div>` : ''}
   <div class="grid g4">
@@ -351,7 +352,8 @@ function applyAnswer(k, t) {
 VIEWS.bienvenue = () => {
   const e = +(route.q.e || 1), p = st.profile;
   const head = (n, t, d) => `<div class="onb-head"><div class="auth-logo">${LOGO}<span>anza</span></div><div class="onb-steps">${[1, 2, 3].map(i => `<i class="${i <= n ? 'on' : ''}"></i>`).join('')}</div><p class="kick">Étape ${n} sur 3</p><h1>${t}</h1><p class="mute">${d}</p></div>`;
-  if (e === 1) return `<div class="onb">${head(1, `Bienvenue${p.first ? ' ' + esc(p.first) : ''} !`, 'Nia, votre brand manager, va vous poser quelques questions. Comptez une dizaine de minutes. Tout ce que vous direz servira à écrire vos contenus, vos devis et vos relances.')}<div class="card">${niaChat(true)}</div></div>`;
+  const askKey = has(3) && !aiOn() && !st.aiLater && !(st.interview.msgs || []).some(m => m.f === 'u');
+  if (e === 1) return `<div class="onb">${head(1, `Bienvenue${p.first ? ' ' + esc(p.first) : ''} !`, askKey ? 'Avant de commencer, branchez Claude : c’est lui qui donnera à Nia toute son intelligence, dès la première question.' : 'Nia, votre brand manager, va vous poser quelques questions. Comptez une dizaine de minutes. Tout ce que vous direz servira à écrire vos contenus, vos devis et vos relances.')}<div class="card">${askKey ? connectBox('onb') : niaChat(true)}</div></div>`;
   if (e === 2) return `<div class="onb">${head(2, 'Vos prestations et vos prix', 'Ils servent pour vos devis, vos offres et votre landing page. Vous pourrez les modifier à tout moment.')}
     <div class="card"><div class="svc-list">${st.services.map((s, i) => `<div class="svc"><input value="${esc(s.name)}" data-i="set" data-path="services.${i}.name" aria-label="Prestation"><div class="eurin"><input type="number" step="0.5" min="0" value="${s.price}" data-i="set" data-num data-path="services.${i}.price" aria-label="Prix"><span>€</span></div><button class="x" data-a="svcDel" data-n="${i}" aria-label="Supprimer">×</button></div>`).join('') || '<p class="mute">Aucune prestation pour l’instant.</p>'}</div>
     <button class="btn sec" style="margin-top:12px" data-a="svcAdd">${ic('plus')}Ajouter une prestation</button></div>
@@ -573,18 +575,20 @@ A.copyLi = () => copyText(st.aiBios && st.aiBios.linkedin ? st.aiBios.linkedin :
 A.bioAI = async () => { if (busy) return; busy = true; refresh(); try { const r = await aiBios(); st.aiBios = { bios: (r.bios || []).filter(Boolean).slice(0, 3), linkedin: r.linkedin || '' }; bioIdx = 0; save(); toast('Bios écrites par Nia'); } catch (e) { toast(aiError(e)); } busy = false; refresh(); };
 
 let lp = null;
+function lpDefault() { const q = P(); return { headline: uc(q.value), sub: `${uc(q.activity)}, ${q.city}. ${dot(q.proof)}`, cta: st.profile.phone ? 'Réserver sur WhatsApp' : 'Me contacter' }; }
 VIEWS.landing = () => {
   if (!has(2)) return lockView(2, 'La mini landing page est dans la Boutique', 'Une page à votre image, prête à recevoir vos demandes de rendez vous. Incluse dans la Boutique et le Magasin.');
-  if (!lp) { const q = P(); lp = { headline: uc(q.value), sub: `${uc(q.activity)}, ${q.city}. ${dot(q.proof)}`, cta: st.profile.phone ? 'Réserver sur WhatsApp' : 'Me contacter' }; }
+  if (!lp) lp = st.lp ? Object.assign({}, st.lp) : lpDefault();
   return `<div class="head"><div><p class="kick">Boutique</p><h1>Votre mini landing page</h1><p>Construite à partir de votre profil, de votre charte et de vos prestations. Mettez la en lien dans votre bio.</p></div>
   <div class="btns">${aiOn() ? `<button class="btn sec" data-a="lpAI" ${busy ? 'disabled' : ''}>${ic('spark')}${busy ? 'Nia écrit' : 'Écrire avec Nia'}</button>` : ''}<button class="btn sec" data-a="lpOpen">Ouvrir en grand</button><button class="btn pri" data-a="lpDl">${ic('dl')}Télécharger le fichier</button></div></div>
   <div class="grid g12"><div class="card"><div class="form"><div class="field"><label for="lp-h">Titre</label><input id="lp-h" value="${esc(lp.headline)}" data-i="lp" data-k="headline"></div><div class="field"><label for="lp-s">Sous titre</label><textarea id="lp-s" data-i="lp" data-k="sub">${esc(lp.sub)}</textarea></div><div class="field"><label for="lp-c">Bouton</label><input id="lp-c" value="${esc(lp.cta)}" data-i="lp" data-k="cta"></div>
   <div class="tip"><i>✓</i><div>Les prestations viennent de vos réglages, les couleurs de votre charte. Le bouton ouvre WhatsApp avec un message prêt.</div></div></div></div>
   <div class="lp-frame"><div class="lp-bar"><i></i><i></i><i></i><span>Aperçu de votre page</span></div><iframe id="lpf" title="Aperçu de la landing page" style="width:100%;height:620px;border:0;display:block"></iframe></div></div>`;
 };
-AFTER.landing = () => { const f = $('#lpf'); if (f) f.srcdoc = landingHTML(lp); };
-I.lp = el => { lp[el.dataset.k] = el.value; clearTimeout(window._lpt); window._lpt = setTimeout(AFTER.landing, 250); };
-A.lpAI = async () => { if (busy) return; busy = true; refresh(); try { const r = await aiLanding(); lp = { headline: r.headline || lp.headline, sub: r.sub || lp.sub, cta: r.cta || lp.cta }; toast('Textes écrits par Nia'); } catch (e) { toast(aiError(e)); } busy = false; refresh(); };
+AFTER.landing = () => { const f = $('#lpf'); if (f) f.srcdoc = landingHTML(lp); if (aiOn() && has(2) && !busy && !(st.lp && st.lp.ai) && !autoTried.lp) { autoTried.lp = true; A.lpAI(); } };
+const autoTried = {};
+I.lp = el => { lp[el.dataset.k] = el.value; st.lp = Object.assign({}, lp); save(); clearTimeout(window._lpt); window._lpt = setTimeout(AFTER.landing, 250); };
+A.lpAI = async () => { if (busy) return; busy = true; refresh(); try { const r = await aiLanding(); lp = { headline: r.headline || lp.headline, sub: r.sub || lp.sub, cta: r.cta || lp.cta }; st.lp = Object.assign({ ai: true }, lp); save(); toast('Textes écrits par Nia avec Claude'); } catch (e) { toast(aiError(e)); } busy = false; refresh(); };
 A.lpDl = () => download('index.html', landingHTML(lp), 'text/html');
 A.lpOpen = () => { const w = window.open('', '_blank'); if (w) { w.document.write(landingHTML(lp)); w.document.close(); } };
 
@@ -593,6 +597,7 @@ VIEWS.ia = () => {
   const pct = personalization(), ang = bestAngle(), a = st.ai, sample = followMessage('prospect', { name: 'Camille Martin' });
   const deg = pct * 3.6;
   return `<div class="head"><div><p class="kick">Magasin</p><h1>Mon IA personnelle</h1><p>Elle apprend de chaque réponse à Nia et de chaque publication. Plus vous l’utilisez, plus elle écrit comme vous.</p></div>${aiBadge()}</div>
+  ${aiOn() ? '' : `<div class="card" style="margin-bottom:16px">${connectBox('home')}</div>`}
   <div class="grid g12"><div class="card dark" style="display:flex;flex-direction:column;align-items:center;text-align:center"><div class="ring2" style="background:conic-gradient(#82A7FF ${deg}deg,#1A2547 0)"><div style="position:absolute;inset:12px;border-radius:50%;background:var(--night)"></div><b style="position:relative">${pct} %</b></div>
     <p style="margin-top:16px;font-weight:700">Niveau de personnalisation</p><p class="mute" style="font-size:13px;margin-top:6px">${plural(Object.keys(st.interview.answers).length, 'réponse', 'réponses')} à l’entretien, ${plural(st.weekly.length, 'question', 'questions')} de la semaine, ${plural(st.perf.length, 'publication analysée', 'publications analysées')}</p></div>
   <div class="card"><h3>Réglages de votre voix</h3>${[['warmth', 'Chaleur'], ['humor', 'Humour'], ['formal', 'Élégance'], ['length', 'Longueur']].map(([k, l]) => `<div class="slider"><b>${l}</b><input type="range" min="0" max="100" value="${a[k]}" data-i="aiSlide" data-k="${k}" aria-label="${l}"><span id="sv-${k}">${a[k]}</span></div>`).join('')}
@@ -629,7 +634,7 @@ VIEWS.parler = () => {
     <div class="chat" id="nchat" style="margin-top:14px;max-height:560px">${h.length ? '' : '<div class="msg n">Bonjour ! Je suis là pour vous aider. Que voulez vous travailler aujourd’hui ?</div>'}${h.map((m, i) => `<div class="msg ${m.f}">${esc(m.t)}${m.act ? actCards(m.act, i) : ''}</div>`).join('')}${typing ? '<div class="msg n typing"><i></i><i></i><i></i></div>' : ''}</div>
     ${h.length ? '' : `<div class="btns" style="margin-top:10px">${sugg.map(s => `<button class="btn sec sm" data-a="chatSugg" data-t="${esc(s)}">${esc(s)}</button>`).join('')}</div>`}
     <div class="compose"><textarea id="nc-in" placeholder="Écrivez à Nia" data-enter="chatSend" aria-label="Votre message" ${typing ? 'disabled' : ''}></textarea><button class="btn pri" data-a="chatSend" style="height:auto" aria-label="Envoyer">${ic('send')}</button></div>
-    ${aiOn() ? '' : '<p class="mute" style="font-size:12px;margin-top:8px">Nia n’est pas encore connectée à ' + AI_NAME + ' : elle vous oriente vers les bons outils. Connectez la dans les Réglages.</p>'}</div>
+    ${aiOn() ? '' : '<div style="margin-top:16px">' + connectBox('chat') + '</div>'}</div>
   <div class="grid" style="align-content:start"><div class="card"><h3>Ce que Nia sait de vous</h3><ul class="learn" style="margin-top:8px"><li><b>Positionnement</b>${esc(st.profile.value || 'À définir avec l’entretien')}</li><li><b>Focus</b>${esc(st.focus || 'Aucun pour l’instant')}</li><li><b>Mémoire</b>${plural((st.memory || []).length, 'note', 'notes')}</li></ul><a class="btn ghost sm" style="margin-top:8px" href="#/journal">Voir le journal</a></div>
   <div class="card"><h3>Ce que Nia peut faire</h3><p class="mute" style="font-size:14px;margin-top:8px">Planifier des publications, mettre à jour votre profil, retenir une information importante. Elle vous propose toujours l’action, vous décidez.</p></div></div></div>`;
 };
@@ -640,6 +645,8 @@ function actCards(act, i) {
   ${act.applied ? '<p class="act-ok">✓ Appliqué</p>' : `<button class="btn pri sm" data-a="chatApply" data-n="${i}">Appliquer</button>`}</div>`;
 }
 AFTER.parler = () => { const c = $('#nchat'); if (c) c.scrollTop = c.scrollHeight; };
+AFTER.charte = () => { if (aiOn() && !busy && !(st.aiBios && st.aiBios.bios && st.aiBios.bios.length) && !autoTried.bio) { autoTried.bio = true; A.bioAI(); } };
+AFTER.ia = () => { if (aiOn() && has(3) && !busy && !(st.aiSuggest && st.aiSuggest.week === weekKey()) && !autoTried.sug) { autoTried.sug = true; A.suggestAI(); } };
 A.chatClear = () => { st.niaChat = []; save(); refresh(); };
 A.chatSugg = el => { $('#nc-in').value = el.dataset.t; A.chatSend(); };
 function chatFallback(t) {
@@ -731,7 +738,31 @@ function aiSettings() {
   ${mode ? '<div class="btns" style="margin-top:12px"><button class="btn sec sm" data-a="keyTest">Tester la connexion</button></div>' : ''}
   ${keyBox}</div>`;
 }
-A.keySave = () => { const k = val('ck').trim(); if (!/^sk-ant-/.test(k)) { toast('Une clé Claude commence par sk-ant-'); return; } try { localStorage.setItem(keyStore(), k); } catch (e) {} toast('Clé enregistrée sur cet appareil'); refresh(); };
+function connectBox(ctx) {
+  const later = ctx === 'onb' ? '<button class="btn ghost sm" data-a="aiLater">Plus tard, commencer sans Claude</button>' : '';
+  return `<div class="connect ${ctx === 'home' ? 'connect-home' : ''}"><div class="connect-top"><div class="av nia">N</div><div><b>Branchez Claude, le cerveau de Nia</b><p class="mute">Connectée à votre compte Claude, Nia mène un vrai entretien, rebondit sur chaque réponse, choisit vos questions de la semaine, écrit stories, posts, bios et relances, et répond à tout dans Parler à Nia.</p></div></div>
+  <ol class="mute connect-steps"><li>Ouvrez <a href="https://platform.claude.com" target="_blank" rel="noopener">platform.claude.com</a> et connectez vous.</li><li>Dans Billing, ajoutez quelques euros de crédits.</li><li>Dans API Keys, créez une clé et collez la ici.</li></ol>
+  <div class="row connect-row"><input id="ck" type="password" autocomplete="off" placeholder="sk-ant-…" aria-label="Clé API Claude"><button class="btn pri sm" data-a="keyConnect" ${keyBusy ? 'disabled' : ''}>${keyBusy ? 'Connexion' : 'Connecter'}</button>${later}</div>
+  <small class="mute">Votre clé reste sur cet appareil et n’est jamais envoyée à Anza. Les appels sont facturés sur votre compte Claude, quelques centimes par action.</small></div>`;
+}
+let keyBusy = false;
+A.keyConnect = async () => {
+  const k = val('ck').trim();
+  if (!/^sk-ant-/.test(k)) { toast('Une clé Claude commence par sk-ant-'); return; }
+  try { localStorage.setItem(keyStore(), k); } catch (e) {}
+  keyBusy = true; refresh();
+  try {
+    const r = await aiWeeklyQuestion();
+    st.weeklyQ = { week: weekKey(), q: r.question, why: r.why || '' }; st.aiLater = false; save();
+    toast('Claude est maintenant le cerveau de Nia');
+  } catch (e) {
+    try { localStorage.removeItem(keyStore()); } catch (x) {}
+    toast(aiError(e));
+  }
+  keyBusy = false; refresh();
+};
+A.keySave = A.keyConnect;
+A.aiLater = () => { st.aiLater = true; save(); refresh(); };
 A.keyDel = () => { try { localStorage.removeItem(keyStore()); } catch (e) {} toast('Clé retirée'); refresh(); };
 A.keyTest = async el => { const lbl = el.textContent; el.disabled = true; el.textContent = 'Test en cours'; try { const r = await aiWeeklyQuestion(); toast('Connexion réussie. Nia demande : ' + r.question); } catch (e) { toast(aiError(e)); } el.disabled = false; el.textContent = lbl; };
 function histCard() {
