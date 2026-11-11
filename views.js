@@ -167,7 +167,7 @@ function finishFollow(id, rule) {
   c.lastContact = iso(Date.now()); save();
 }
 A.sendWa = el => { const c = clientById(el.dataset.id); window.open(wa(c.phone, val('msg-' + el.dataset.i)), '_blank', 'noopener'); finishFollow(el.dataset.id, el.dataset.r); toast('Relance envoyée'); refresh(); };
-A.sendMail = el => { const c = clientById(el.dataset.id); location.href = `mailto:${c.email}?subject=${encodeURIComponent(st.profile.business)}&body=${encodeURIComponent(val('msg-' + el.dataset.i))}`; finishFollow(el.dataset.id, el.dataset.r); toast('Relance envoyée'); setTimeout(refresh, 300); };
+A.sendMail = el => { const c = clientById(el.dataset.id); location.href = `mailto:${encodeURIComponent(c.email || '')}?subject=${encodeURIComponent(st.profile.business)}&body=${encodeURIComponent(val('msg-' + el.dataset.i))}`; finishFollow(el.dataset.id, el.dataset.r); toast('Relance envoyée'); setTimeout(refresh, 300); };
 A.markDone = el => { finishFollow(el.dataset.id, el.dataset.r); toast('Relance marquée comme faite'); refresh(); };
 
 VIEWS.devis = () => {
@@ -560,28 +560,29 @@ A.bilanDl = () => { const f = window._bilan; showImages(f.map((x, i) => drawStor
 
 let bioIdx = 0;
 VIEWS.charte = () => {
-  const b = st.brand, p = st.profile, list = st.aiBios && st.aiBios.bios && st.aiBios.bios.length ? st.aiBios.bios : bios(), bio = list[bioIdx % list.length], li = st.aiBios && st.aiBios.linkedin ? st.aiBios.linkedin : linkedinHeadline();
+  const b = st.brand, p = st.profile, list = aiBiosOk() ? st.aiBios.bios : bios(), bio = fitBio(list[bioIdx % list.length], 150), li = aiBiosOk() && st.aiBios.linkedin ? tidy(st.aiBios.linkedin) : linkedinHeadline();
   return `<div class="head"><div><p class="kick">Attirer</p><h1>Charte et bio</h1><p>Vos couleurs, votre police et votre ton, enregistrés une fois. Tout ce qu’Anza produit les respecte.</p></div></div>
   <div class="grid g2"><div class="card"><h3>Couleurs</h3><div class="row" style="margin-top:14px;gap:18px">${[['primary', 'Principale'], ['accent', 'Accent'], ['soft', 'Douce'], ['ink', 'Texte']].map(([k, l]) => `<label style="text-align:center;font-size:12px;font-weight:600"><div class="swatch" style="margin:0 auto 6px"><input type="color" value="${b[k]}" data-c="set" data-path="brand.${k}" data-live="1" aria-label="${l}"></div>${l}</label>`).join('')}</div>
     <div class="form" style="margin-top:20px"><div class="field"><label>Police</label><div class="seg">${['Inter', 'Serif'].map(f => `<button class="${b.font === f ? 'on' : ''}" data-a="setFont" data-f="${f}" style="font-family:${f === 'Serif' ? 'Georgia,serif' : 'Inter'}">${f === 'Serif' ? 'Élégante' : 'Moderne'}</button>`).join('')}</div></div>
     <div class="field"><label>Vous ou tu</label><div class="seg">${[['vous', 'Vouvoiement'], ['tu', 'Tutoiement']].map(([k, l]) => `<button class="${p.tone === k ? 'on' : ''}" data-a="setTone" data-t="${k}">${l}</button>`).join('')}</div></div>
     <label class="row"><input type="checkbox" ${b.emoji ? 'checked' : ''} data-c="set" data-path="brand.emoji"> Utiliser des emojis</label>
     <div class="field"><label for="cta">Bouton d’action</label><input id="cta" value="${esc(p.cta || '')}" data-i="set" data-path="profile.cta"></div></div>
-    <div class="prev3">${['Bleu', 'Nuit', 'Clair'].map(s => { const c = palette(s); return `<div style="aspect-ratio:9/16;border-radius:12px;background:${c.bg};color:${c.fg};padding:12px;display:flex;flex-direction:column;font-family:${b.font === 'Serif' ? 'Georgia,serif' : 'Inter'}"><b style="margin-top:auto;font-size:15px;line-height:1.1">${esc(p.value)}.</b><span style="margin-top:8px;border-radius:12px;background:${c.cb};color:${c.cf};font-size:10px;font-weight:700;text-align:center;padding:6px">${esc(p.cta || 'Réserver')}</span></div>`; }).join('')}</div></div>
+    <div class="prev3">${['Bleu', 'Nuit', 'Clair'].map(s => { const c = palette(s); return `<div style="aspect-ratio:9/16;border-radius:12px;background:${c.bg};color:${c.fg};padding:12px;display:flex;flex-direction:column;font-family:${b.font === 'Serif' ? 'Georgia,serif' : 'Inter'}"><b style="margin-top:auto;font-size:15px;line-height:1.1">${esc(tidy(dot(p.value)))}</b><span style="margin-top:8px;border-radius:12px;background:${c.cb};color:${c.cf};font-size:10px;font-weight:700;text-align:center;padding:6px">${esc(p.cta || 'Réserver')}</span></div>`; }).join('')}</div></div>
   <div class="grid" style="align-content:start"><div class="card"><h3>Bio Instagram <div class="btns">${aiOn() ? `<button class="btn ghost sm" data-a="bioAI" ${busy ? 'disabled' : ''}>${ic('spark')}${busy ? 'Nia écrit' : 'Écrire avec Nia'}</button>` : ''}<button class="btn ghost sm" data-a="bioNext">Autre version</button><button class="btn sec sm" data-a="copyBio">${ic('copy')}Copier</button></div></h3>
     <div class="bio" style="margin-top:14px"><div class="igh"><div class="ring"><div>${initials(p.business)}</div></div><div><b>${esc(p.instagram)}</b><div class="mute" style="font-size:13px">${esc(p.business)}</div></div></div><p style="white-space:pre-line;margin-top:12px;font-size:14px">${esc(bio)}</p><p style="color:var(--navy);font-weight:600;font-size:14px;margin-top:4px">Votre lien en bio</p></div>
-    <p class="mute" style="font-size:12px;margin-top:8px">${bio.length} caractères sur 150</p></div>
+    <p class="mute" style="font-size:12px;margin-top:8px">${[...bio].length} caractères sur 150, la limite d’Instagram</p></div>
     <div class="card"><h3>Titre LinkedIn <button class="btn sec sm" data-a="copyLi">${ic('copy')}Copier</button></h3><p style="margin-top:12px;font-weight:600">${esc(li)}</p></div></div></div>`;
 };
 A.setFont = el => { st.brand.font = el.dataset.f; save(); refresh(); };
 A.setTone = el => { st.profile.tone = el.dataset.t; save(); refresh(); };
 A.bioNext = () => { bioIdx++; refresh(); };
-A.copyBio = () => { const l = st.aiBios && st.aiBios.bios && st.aiBios.bios.length ? st.aiBios.bios : bios(); copyText(l[bioIdx % l.length]); };
-A.copyLi = () => copyText(st.aiBios && st.aiBios.linkedin ? st.aiBios.linkedin : linkedinHeadline());
-A.bioAI = async () => { if (busy) return; busy = true; refresh(); try { const r = await aiBios(); st.aiBios = { bios: (r.bios || []).filter(Boolean).slice(0, 3), linkedin: r.linkedin || '' }; bioIdx = 0; save(); toast('Bios écrites par Nia'); } catch (e) { toast(aiError(e)); } busy = false; refresh(); };
+function aiBiosOk() { const a = st.aiBios; return !!(a && a.bios && a.bios.length && a.cta === (st.profile.cta || '') && a.emoji === !!st.brand.emoji); }
+A.copyBio = () => { const l = aiBiosOk() ? st.aiBios.bios : bios(); copyText(fitBio(l[bioIdx % l.length], 150)); };
+A.copyLi = () => copyText(aiBiosOk() && st.aiBios.linkedin ? tidy(st.aiBios.linkedin) : linkedinHeadline());
+A.bioAI = async () => { if (busy) return; busy = true; refresh(); try { const r = await aiBios(); st.aiBios = { bios: (r.bios || []).filter(Boolean).slice(0, 3).map(x => fitBio(x, 150)), linkedin: r.linkedin || '', cta: st.profile.cta || '', emoji: !!st.brand.emoji }; bioIdx = 0; save(); toast('Bios écrites par Nia'); } catch (e) { toast(aiError(e)); } busy = false; refresh(); };
 
 let lp = null;
-function lpDefault() { const q = P(); return { headline: uc(q.value), sub: `${uc(q.activity)}, ${q.city}. ${dot(q.proof)}`, cta: st.profile.phone ? 'Réserver sur WhatsApp' : 'Me contacter' }; }
+function lpDefault() { const q = P(); return { headline: uc(q.value), sub: `${uc(q.activity)}, ${q.city}. ${dot(q.proof)}`, cta: st.profile.cta || (st.profile.phone ? 'Réserver sur WhatsApp' : 'Me contacter') }; }
 VIEWS.landing = () => {
   if (!has(2)) return lockView(2, 'La mini landing page est dans la Boutique', 'Une page à votre image, prête à recevoir vos demandes de rendez vous. Incluse dans la Boutique et le Magasin.');
   if (!lp) lp = st.lp ? Object.assign({}, st.lp) : lpDefault();
@@ -668,7 +669,7 @@ function actCards(act, i) {
   ${act.applied ? '<p class="act-ok">✓ Appliqué</p>' : `<button class="btn pri sm" data-a="chatApply" data-n="${i}">Appliquer</button>`}</div>`;
 }
 AFTER.parler = () => { const c = $('#nchat'); if (c) c.scrollTop = c.scrollHeight; };
-AFTER.charte = () => { if (aiOn() && !busy && !(st.aiBios && st.aiBios.bios && st.aiBios.bios.length) && !autoTried.bio) { autoTried.bio = true; A.bioAI(); } };
+AFTER.charte = () => { if (aiOn() && !busy && !aiBiosOk() && !autoTried.bio) { autoTried.bio = true; A.bioAI(); } };
 AFTER.ia = () => { if (aiOn() && has(3) && !busy && !(st.aiSuggest && st.aiSuggest.week === weekKey()) && !autoTried.sug) { autoTried.sug = true; A.suggestAI(); } };
 A.chatClear = () => { st.niaChat = []; save(); refresh(); };
 A.chatSugg = el => { $('#nc-in').value = el.dataset.t; A.chatSend(); };
@@ -750,13 +751,13 @@ function aiSettings() {
   const mode = aiMode(), own = !!localKey(), canKey = ownKeyAllowed() && (!ONLINE || has(3));
   const status = mode === 'local' ? 'Nia est connectée à Claude avec votre propre clé. Elle est enregistrée uniquement sur cet appareil et les appels sont facturés sur votre compte Claude.'
     : mode === 'server' ? 'Nia est connectée à ' + AI_NAME + ' par le serveur sécurisé Anza.'
-    : ONLINE ? (has(3) ? 'Connexion à ' + AI_NAME + ' en attente de configuration du serveur. Vous pouvez dès maintenant connecter votre propre compte Claude ci dessous.' : 'Nia connectée à ' + AI_NAME + ' est incluse dans le Magasin.')
+    : ONLINE ? (has(3) ? (ownKeyAllowed() ? 'Vous pouvez connecter votre propre compte Claude ci dessous. ' : 'L’équipe Anza finalise la connexion à ' + AI_NAME + '. ') + 'En attendant, Nia fonctionne déjà avec ses modèles intégrés : entretien, question de la semaine, contenus et relances.' : 'Nia connectée à ' + AI_NAME + ' est incluse dans le Magasin.')
     : 'Nia utilise les modèles intégrés. Ajoutez une clé Claude pour la connecter.';
   const keyBox = canKey ? `<div class="keybox" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--line)">
     <b style="font-size:14px">Connecter mon propre compte Claude</b>
     <ol class="mute" style="font-size:13px;line-height:1.6;margin:8px 0 0 18px"><li>Ouvrez <a href="https://platform.claude.com" target="_blank" rel="noopener">platform.claude.com</a> et connectez vous.</li><li>Ajoutez quelques euros de crédits dans Billing.</li><li>Dans API Keys, créez une clé et collez la ici.</li></ol>
     <div class="row" style="margin-top:12px;flex-wrap:wrap"><input id="ck" type="password" autocomplete="off" placeholder="${own ? 'Clé enregistrée sur cet appareil' : 'sk-ant-…'}" style="flex:1;min-width:220px;border:1px solid var(--line);border-radius:10px;padding:9px 12px" aria-label="Clé API Claude"><button class="btn pri sm" data-a="keySave">${own ? 'Remplacer' : 'Enregistrer'}</button>${own ? '<button class="btn danger sm" data-a="keyDel">Retirer</button>' : ''}</div>
-    <small class="mute" style="display:block;margin-top:8px">Votre clé reste sur cet appareil, n’est jamais envoyée à Anza et sert uniquement à appeler Claude. Sur un autre appareil, collez la à nouveau. ${ONLINE && CFG.aiServer ? 'Retirez la pour revenir au serveur Anza.' : ''}</small></div>` : '';
+    <small class="mute" style="display:block;margin-top:8px">Votre clé reste sur cet appareil, n’est jamais envoyée à Anza et sert uniquement à appeler Claude. Elle s’efface à la déconnexion : collez la à nouveau à la prochaine connexion ou sur un autre appareil. ${ONLINE && CFG.aiServer ? 'Retirez la pour revenir au serveur Anza.' : ''}</small></div>` : '';
   return `<div class="card" style="margin-top:16px"><h3>Nia et ${mode === 'local' ? 'Claude' : AI_NAME} ${aiBadge()}</h3><p class="mute" style="font-size:14px;margin-top:8px">${status}</p>
   ${mode ? '<div class="btns" style="margin-top:12px"><button class="btn sec sm" data-a="keyTest">Tester la connexion</button></div>' : ''}
   ${keyBox}</div>`;
@@ -767,7 +768,7 @@ function connectBox(ctx) {
   return `<div class="connect ${ctx === 'home' ? 'connect-home' : ''}"><div class="connect-top"><div class="av nia">N</div><div><b>Branchez Claude, le cerveau de Nia</b><p class="mute">Connectée à votre compte Claude, Nia mène un vrai entretien, rebondit sur chaque réponse, choisit vos questions de la semaine, écrit stories, posts, bios et relances, et répond à tout dans Parler à Nia.</p></div></div>
   <ol class="mute connect-steps"><li>Ouvrez <a href="https://platform.claude.com" target="_blank" rel="noopener">platform.claude.com</a> et connectez vous.</li><li>Dans Billing, ajoutez quelques euros de crédits.</li><li>Dans API Keys, créez une clé et collez la ici.</li></ol>
   <div class="row connect-row"><input id="ck" type="password" autocomplete="off" placeholder="sk-ant-…" aria-label="Clé API Claude"><button class="btn pri sm" data-a="keyConnect" ${keyBusy ? 'disabled' : ''}>${keyBusy ? 'Connexion' : 'Connecter'}</button>${later}</div>
-  <small class="mute">Votre clé reste sur cet appareil et n’est jamais envoyée à Anza. Les appels sont facturés sur votre compte Claude, quelques centimes par action.</small></div>`;
+  <small class="mute">Votre clé reste sur cet appareil, n’est jamais envoyée à Anza et s’efface à la déconnexion. Les appels sont facturés sur votre compte Claude, quelques centimes par action.</small></div>`;
 }
 let keyBusy = false;
 A.keyConnect = async () => {

@@ -51,6 +51,13 @@ function migrate(o) {
   if (!Array.isArray(out.rules) || out.rules.length !== 4) out.rules = blankState().rules;
   out.clients = out.clients.filter(c => c && c.id).map(c => Object.assign({ name: '', phone: '', email: '', source: 'Autre', status: 'prospect', notes: '', createdAt: iso(Date.now()), lastContact: c.createdAt || iso(Date.now()), next: '', history: [] }, c, { history: Array.isArray(c.history) ? c.history : [] }));
   out.calendar = out.calendar.filter(e => e && e.id && e.date).map(e => Object.assign({ type: 'Story', angle: 'Offre', title: '', done: false }, e));
+  const okStatus = ['prospect', 'devis', 'client', 'fidele'], okType = ['Story', 'Carrousel', 'LinkedIn', 'Bilan'], okQ = ['brouillon', 'envoye', 'accepte', 'refuse'];
+  out.clients.forEach(c => { if (!okStatus.includes(c.status)) c.status = 'prospect'; c.id = String(c.id).replace(/[^\w-]/g, ''); });
+  out.calendar.forEach(e => { if (!okType.includes(e.type)) e.type = 'Story'; e.id = String(e.id).replace(/[^\w-]/g, ''); if (!/^\d{4}-\d{2}-\d{2}$/.test(e.date)) e.date = iso(Date.now()); });
+  out.quotes.forEach(q => { if (!okQ.includes(q.status)) q.status = 'brouillon'; q.id = String(q.id).replace(/[^\w-]/g, ''); });
+  out.tasks = (out.tasks || []).filter(k => k && k.id && k.title).map(k => Object.assign({}, k, { id: String(k.id).replace(/[^\w-]/g, ''), col: String(k.col || 'todo').replace(/[^\w-]/g, ''), prio: k.prio === 'haute' ? 'haute' : 'normale', due: /^\d{4}-\d{2}-\d{2}$/.test(k.due || '') ? k.due : '' }));
+  out.taskCols = (out.taskCols || []).filter(c => c && c.id && c.name).map(c => ({ id: String(c.id).replace(/[^\w-]/g, ''), name: String(c.name).slice(0, 40), done: !!c.done }));
+  ['primary', 'accent', 'soft', 'ink'].forEach(k => { if (!/^#[0-9a-f]{3,8}$/i.test(out.brand[k] || '')) out.brand[k] = blankState().brand[k]; });
   out.quotes = out.quotes.filter(q => q && q.id).map(q => Object.assign({ lines: [], discount: 0, status: 'brouillon' }, q));
   out.v = 2;
   return out;

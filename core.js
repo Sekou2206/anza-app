@@ -1,4 +1,5 @@
 let st = null;
+if (window.top !== window.self) { try { window.top.location = window.self.location.href; } catch (e) { document.documentElement.style.display = 'none'; } }
 const AI_NAME = (window.ANZA_CONFIG && window.ANZA_CONFIG.aiName) || 'Claude';
 
 const $ = (s, c = document) => c.querySelector(s);

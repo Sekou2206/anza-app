@@ -28,6 +28,7 @@ function brief() {
   return JSON.stringify({
     date: iso(Date.now()),
     profil: { prenom: p.first, activite: p.business, metier: p.activity, secteur: p.sector || '', lieu: p.city, histoire: p.story, clients_ideaux: p.target, probleme: p.problem, valeur: p.value, preuves: p.proof, ton: p.vibe, adresse: p.tone === 'tu' ? 'tutoiement' : 'vouvoiement', limites: p.limits, bouton: p.cta, instagram: p.instagram },
+    charte: { emojis: st.brand.emoji ? 'autorisés avec parcimonie' : 'interdits, n’en mets aucun', bouton_action: p.cta || 'Réserver', police: st.brand.font === 'Serif' ? 'élégante' : 'moderne' },
     prestations: st.services.slice(0, 12).map(s => ({ nom: s.name, prix: s.price })),
     reglages_voix: st.ai,
     focus_du_moment: st.focus || '',
@@ -60,10 +61,10 @@ async function callClaude(task, system, messages, tool, maxTokens) {
   } finally { clearTimeout(timer); }
   const blocks = (out && out.content) || [];
   const tu = blocks.find(b => b.type === 'tool_use' && b.name === tool.name);
-  if (tu && tu.input) return tu.input;
+  if (tu && tu.input) return deepTidy(tu.input);
   const txt = blocks.filter(b => b.type === 'text').map(b => b.text).join('\n');
   const m = txt.match(/\{[\s\S]*\}/);
-  if (m) { try { return JSON.parse(m[0]); } catch (e) {} }
+  if (m) { try { return deepTidy(JSON.parse(m[0])); } catch (e) {} }
   throw new Error('format');
 }
 
@@ -141,7 +142,7 @@ async function aiFollow(rule, c, label) {
 }
 
 async function aiBios() {
-  const sys = `${NIA_SYSTEM}\n\nProfil : ${brief()}\n\nÉcris 3 bios Instagram différentes (150 caractères maximum chacune, retours à la ligne autorisés, un emoji maximum par ligne) et un titre LinkedIn (220 caractères maximum).`;
+  const sys = `${NIA_SYSTEM}\n\nProfil : ${brief()}\n\nÉcris 3 bios Instagram différentes (150 caractères maximum chacune, espaces et retours à la ligne compris, retours à la ligne autorisés${st.brand.emoji ? ', un emoji maximum par ligne' : ', aucun emoji'}). La dernière ligne invite à l’action avec le bouton choisi : « ${st.profile.cta || 'Réserver'} » et un titre LinkedIn (220 caractères maximum).`;
   return callClaude('bios', sys, [{ role: 'user', content: 'Mes bios, s’il te plaît.' }], T('nia_bios', 'Bios', { bios: { type: 'array', minItems: 3, maxItems: 3, items: S }, linkedin: S }), 1500);
 }
 

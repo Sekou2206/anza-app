@@ -125,6 +125,12 @@ Le guide complet, étape par étape jusqu’à la livraison au client, est dans 
 
 ## 7. À savoir
 
+**Sécurité**
+- Mot de passe effacé de la page dès la connexion, 10 caractères minimum avec lettres et chiffres.
+- Politique de sécurité du contenu (CSP) : aucun script ni appel vers un domaine non autorisé, affichage bloqué dans un site tiers.
+- Clé Claude personnelle effacée à la déconnexion. Données importées vérifiées avant chargement.
+- Dans Supabase : longueur minimale 10 avec lettres et chiffres, Secure email change et Secure password change, protection contre les mots de passe piratés et délai d’inactivité (plan Pro), Security Advisor une fois par mois. Double authentification sur Supabase, GitHub, IONOS et platform.claude.com.
+
 **Protection des données**
 - Deux appareils modifiés en même temps : l’application fusionne les changements (contacts, devis, calendrier, mémoire de Nia) au lieu d’écraser l’un par l’autre.
 - Hors ligne, tout reste enregistré sur l’appareil et part dès le retour du réseau. La déconnexion est bloquée tant que des modifications ne sont pas envoyées.

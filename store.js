@@ -201,7 +201,8 @@ const AUTH_ERR = {
   'Invalid login credentials': 'Email ou mot de passe incorrect.',
   'User already registered': 'Un compte existe déjà avec cet email. Connectez vous.',
   'Email not confirmed': 'Confirmez d’abord votre email : le lien vous a été envoyé.',
-  'Password should be at least 6 characters.': 'Le mot de passe doit faire au moins 8 caractères.',
+  'Password should be at least 6 characters.': 'Le mot de passe doit faire au moins 10 caractères, avec une lettre et un chiffre.',
+  'Password is known to be weak and easy to guess, please choose a different one.': 'Ce mot de passe est trop connu. Choisissez en un autre.',
   'Email rate limit exceeded': 'Trop de tentatives. Réessayez dans quelques minutes.'
 };
 function authErr(e) { const m = (e && e.message) || ''; return AUTH_ERR[m] || (/network|fetch/i.test(m) ? 'Connexion impossible. Vérifiez votre réseau.' : 'Une erreur est survenue. Réessayez.'); }
@@ -210,7 +211,7 @@ function authView(mode, msg, err) {
   mode = mode || 'login';
   document.body.className = 'auth-on';
   const t = { login: 'Connexion', signup: 'Créer mon compte', forgot: 'Mot de passe oublié', reset: 'Nouveau mot de passe' }[mode];
-  const pw = (id, ac) => `<div class="field"><label for="${id}">Mot de passe</label><input id="${id}" type="password" autocomplete="${ac}" minlength="8" required></div>`;
+  const pw = (id, ac) => `<div class="field"><label for="${id}">Mot de passe</label><input id="${id}" type="password" autocomplete="${ac}" ${ac === 'new-password' ? 'minlength="10"' : ''} required></div>`;
   $('#auth').innerHTML = `<div class="auth-card">
   <div class="auth-logo">${LOGO}<span>anza</span></div>
   ${mode === 'login' || mode === 'signup' ? `<div class="seg auth-tabs"><button class="${mode === 'login' ? 'on' : ''}" data-a="authMode" data-m="login">Connexion</button><button class="${mode === 'signup' ? 'on' : ''}" data-a="authMode" data-m="signup">Créer un compte</button></div>` : `<h1>${t}</h1>`}
@@ -218,7 +219,7 @@ function authView(mode, msg, err) {
   <form class="form" data-form="${mode}" novalidate>
     ${mode === 'signup' ? '<div class="field"><label for="a-first">Prénom</label><input id="a-first" autocomplete="given-name" required></div>' : ''}
     ${mode !== 'reset' ? '<div class="field"><label for="a-email">Email</label><input id="a-email" type="email" autocomplete="email" required></div>' : ''}
-    ${mode === 'login' ? pw('a-pw', 'current-password') : ''}${mode === 'signup' || mode === 'reset' ? pw('a-pw', 'new-password') + '<small class="mute">8 caractères minimum.</small>' : ''}
+    ${mode === 'login' ? pw('a-pw', 'current-password') : ''}${mode === 'signup' || mode === 'reset' ? pw('a-pw', 'new-password') + '<small class="mute">10 caractères minimum, avec au moins une lettre et un chiffre.</small>' : ''}
     ${mode === 'signup' ? `<label class="row auth-consent"><input type="checkbox" id="a-ok"><span>J’accepte les <a href="${CFG.termsUrl || CFG.legalUrl}" target="_blank" rel="noopener">conditions</a> et la <a href="${CFG.privacyUrl}" target="_blank" rel="noopener">politique de confidentialité</a>.</span></label>` : ''}
     <button class="btn pri" type="submit" style="height:46px">${{ login: 'Se connecter', signup: 'Créer mon compte', forgot: 'Recevoir le lien', reset: 'Enregistrer' }[mode]}</button>
   </form>
@@ -233,9 +234,11 @@ document.addEventListener('submit', async e => {
   const f = e.target.closest('[data-form]'); if (!f) return;
   e.preventDefault();
   const mode = f.dataset.form, btn = $('button[type=submit]', f);
-  const email = (val('a-email') || '').trim(), pwv = val('a-pw'), first = (val('a-first') || '').trim();
+  const email = (val('a-email') || '').trim(), first = (val('a-first') || '').trim();
+  let pwv = val('a-pw');
+  wipeAuth(false);
   if (mode !== 'reset' && !/^\S+@\S+\.\S+$/.test(email)) return authView(mode, '', 'Entrez une adresse email valide.');
-  if ((mode === 'signup' || mode === 'reset') && pwv.length < 8) return authView(mode, '', 'Le mot de passe doit faire au moins 8 caractères.');
+  if ((mode === 'signup' || mode === 'reset') && !strongPw(pwv)) { pwv = ''; return authView(mode, '', 'Choisissez un mot de passe d’au moins 10 caractères, avec au moins une lettre et un chiffre.'); }
   if (mode === 'signup' && !first) return authView(mode, '', 'Entrez votre prénom.');
   if (mode === 'signup' && !$('#a-ok').checked) return authView(mode, '', 'Merci d’accepter les conditions et la politique de confidentialité.');
   btn.disabled = true; btn.textContent = 'Un instant';
@@ -309,7 +312,13 @@ async function checkPlan(quiet) {
 A.pendingCheck = () => checkPlan(false);
 A.pendingOut = () => { clearInterval(pendingTimer); signOut(); };
 
+function strongPw(p) { return typeof p === 'string' && p.length >= 10 && /[A-Za-zÀ-ÿ]/.test(p) && /\d/.test(p); }
+function wipeAuth(all) {
+  $$('#auth input[type=password]').forEach(i => { i.value = ''; i.removeAttribute('value'); });
+  if (all) { const a = $('#auth'); if (a) a.innerHTML = ''; }
+}
 function startApp() {
+  wipeAuth(true);
   if (ONLINE && plan === 'attente') { pendingView(); return; }
   clearInterval(pendingTimer);
   document.body.className = '';
@@ -324,7 +333,7 @@ async function signOut() {
     confirmBox('Vos dernières modifications ne sont pas encore enregistrées en ligne. Si vous vous déconnectez maintenant, elles seront perdues. Vérifiez votre connexion internet puis réessayez.', 'Réessayer', () => signOut());
     return;
   }
-  try { localStorage.removeItem(cacheKey()); } catch (e) {}
+  try { localStorage.removeItem(cacheKey()); localStorage.removeItem(keyStore()); } catch (e) {}
   if (ONLINE) await sb.auth.signOut();
   clearInterval(pendingTimer); plan = 'attente';
   user = null; st = null; booted = false; base = null; remoteAt = null; dirty = false;

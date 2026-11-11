@@ -35,6 +35,21 @@ function emo(e) { return st.brand.emoji && st.ai.warmth >= 50 ? ' ' + e : ''; }
 function firstName(n) { return String(n || '').trim().split(' ')[0]; }
 function lc(s) { s = String(s || '').trim(); return s ? s.charAt(0).toLowerCase() + s.slice(1) : s; }
 function uc(s) { s = String(s || '').trim(); return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+const EMOJI_RX = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{2190}-\u{21FF}\u{2300}-\u{23FF}\u{FE0F}\u{200D}\u{20E3}]/gu;
+function tidy(s) {
+  s = String(s == null ? '' : s);
+  if (!(st && st.brand && st.brand.emoji)) s = s.replace(EMOJI_RX, '');
+  return s.replace(/([^.])\.\.(?!\.)/g, '$1.').replace(/[ \t]+([.,!?;:])(?=\s|$)/g, (m, x) => /[!?;:]/.test(x) ? ' ' + x : x).replace(/,\s*\./g, '.').replace(/\.\s*,/g, ',').replace(/[ \t]{2,}/g, ' ').replace(/ *\n */g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+function fitBio(s, max) {
+  max = max || 150; s = tidy(s);
+  if (s.length <= max) return s;
+  let lines = s.split('\n').filter(Boolean);
+  while (lines.length > 2 && lines.join('\n').length > max) lines.splice(lines.length - 2, 1);
+  s = lines.join('\n');
+  if (s.length <= max) return s;
+  s = s.slice(0, max - 1); const cut = s.lastIndexOf(' '); return (cut > max * 0.6 ? s.slice(0, cut) : s).replace(/[\s,;:]+$/, '') + '…';
+}
 function dot(s) { s = String(s || '').trim(); return s ? (/[.!?»]$/.test(s) ? s : s + '.') : ''; }
 function P() {
   const p = st.profile;
@@ -83,7 +98,7 @@ function storyFrames(type, subject) {
       { t: 'Ce n’est pas un hasard.', s: dot(p.story) },
       { t: 'Ce qu’ils disent.', s: dot(p.proof) },
       { t: 'Merci pour votre confiance.', s: V('Chaque avis compte énormément.', 'Chaque avis compte énormément.') },
-      { t: V('À votre tour ?', 'À ton tour ?'), s: V('Réservez votre place.', 'Réserve ta place.'), c: p.cta }
+      { t: V('À votre tour ?', 'À ton tour ?'), s: V(`${uc(p.cta || 'Réserver')} : le lien est en bio.`, `${uc(p.cta || 'Réserver')} : le lien est en bio.`), c: p.cta }
     ],
     'Coulisses': [
       { t: `Dans les coulisses de ${p.business}.`, s: V('Venez, je vous montre.', 'Viens, je te montre.') },
@@ -165,19 +180,19 @@ function postContent(net, format, angle, subject) {
     caption = `${hook}\n\n${dot(p.story)}\n\nCe que je vois chez mes clients : ${lc(dot(p.problem))}\n\nCe que j’ai choisi de faire : ${lc(dot(p.value))}\n\nAujourd’hui : ${lc(dot(p.proof))}\n\nEt vous, qu’est ce qui a fait la différence dans votre parcours ?${tags}`;
   } else {
     const body = slides.slice(1, 4).map(x => `${/^\d\d$/.test(x.k) ? x.k + '. ' : ''}${x.t}`).join('\n');
-    caption = `${hook}${emo('✨')}\n\n${body}\n\n${V('Enregistrez ce post et partagez le.', 'Enregistre ce post et partage le.')}\n${V('Pour réserver : message « INFO » ou lien en bio.', 'Pour réserver : message « INFO » ou lien en bio.')}${tags}`;
-    if (st.ai.length < 30) caption = `${hook}${emo('✨')}\n\n${V('Réservez en bio.', 'Réserve en bio.')}${tags}`;
+    caption = `${hook}${emo('✨')}\n\n${body}\n\n${V('Enregistrez ce post et partagez le.', 'Enregistre ce post et partage le.')}\n${uc(st.profile.cta || 'Réserver')} : message « INFO » ou lien en bio.${tags}`;
+    if (st.ai.length < 30) caption = `${hook}${emo('✨')}\n\n${uc(st.profile.cta || 'Réserver')} : lien en bio.${tags}`;
   }
   return { slides, caption };
 }
 
 function bios() {
-  const p = P();
+  const p = P(), cta = uc(st.profile.cta || V('Réservez votre place', 'Réserve ta place')), arrow = st.brand.emoji ? '👇 ' : '', pin = st.brand.emoji ? '📍 ' : '';
   return [
-    `${uc(p.activity)}, ${p.city}\n${dot(p.value)}\n${dot(p.proof)}\n👇 ${V('Réservez votre place', 'Réserve ta place')}`,
-    `${p.business}\n${dot(p.value)}\nSur rendez vous\n👇 ${V('Infos et réservations', 'Infos et réservations')}`,
-    `${uc(p.activity)}\n${dot(p.proof)}\n📍 ${p.city}\n👇 Message « INFO »`
-  ];
+    `${uc(p.activity)}, ${p.city}\n${dot(p.value)}\n${dot(p.proof)}\n${arrow}${cta}`,
+    `${p.business}\n${dot(p.value)}\nSur rendez vous\n${arrow}${cta}`,
+    `${uc(p.activity)}\n${dot(p.proof)}\n${pin}${p.city}\n${arrow}${cta}`
+  ].map(b => fitBio(b, 150));
 }
 function linkedinHeadline() { const p = P(); return `${uc(p.activity)} à ${p.city} | ${uc(p.value)} | Fondateur de ${p.business}`; }
 
@@ -297,3 +312,11 @@ function drawSlide(sl, i, total, style) {
   return cv.toDataURL('image/png');
 }
 function roundRect(x, a, b, w, h, r) { x.beginPath(); x.moveTo(a + r, b); x.arcTo(a + w, b, a + w, b + h, r); x.arcTo(a + w, b + h, a, b + h, r); x.arcTo(a, b + h, a, b, r); x.arcTo(a, b, a + w, b, r); x.closePath(); }
+
+function deepTidy(o) {
+  if (typeof o === 'string') return tidy(o);
+  if (Array.isArray(o)) return o.map(deepTidy);
+  if (o && typeof o === 'object') { const r = {}; for (const k in o) r[k] = /^(id|date|in_days|format|angle|type|key|style|net)$/.test(k) ? o[k] : deepTidy(o[k]); return r; }
+  return o;
+}
+['storyFrames', 'postContent', 'followMessage', 'linkedinHeadline'].forEach(n => { const f = window[n]; if (typeof f === 'function') window[n] = function () { return deepTidy(f.apply(this, arguments)); }; });
