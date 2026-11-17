@@ -32,6 +32,11 @@ function brief() {
     prestations: st.services.slice(0, 12).map(s => ({ nom: s.name, prix: s.price })),
     reglages_voix: st.ai,
     focus_du_moment: st.focus || '',
+    client_ideal: (st.icp.personas || []).slice(0, 2).map(x => ({ prenom: x.name, age: x.age, situation: x.situation, declencheur: x.trigger, budget: x.budget, problemes: x.pains, envies: x.desires, ses_mots: x.words, hesitations: (x.objections || []).map(o => o.q) })),
+    client_a_eviter: st.icp.anti ? st.icp.anti.portrait : '',
+    voix_de_marque: st.voice.fiche ? { resume: st.voice.fiche.summary, a_faire: st.voice.fiche.dos, a_eviter: st.voice.fiche.donts, mots: st.voice.fiche.top } : '',
+    occasion_proche: (() => { const o = typeof currentOccasion === 'function' && currentOccasion(); return o ? `${o.name}, ${inDays(o.days)}` : ''; })(),
+    saison: typeof season === 'function' ? season() : '',
     memoire: (st.memory || []).slice(-15).map(m => m.text),
     questions_semaine: st.weekly.slice(0, 4).map(w => ({ q: w.q, r: w.a })),
     calendrier_a_venir: st.calendar.filter(e => e.date >= iso(Date.now()) && e.date <= iso(Date.now() + 21 * DAY)).map(e => `${e.date} ${e.type}`).join(', '),
@@ -123,14 +128,19 @@ async function aiWeeklyAnswer(q, a) {
   return callClaude('weekly_answer', sys, [{ role: 'user', content: `Question : ${q}\nMa réponse : ${a}` }], T('nia_analyse', 'Effets de la réponse sur la stratégie', { reply: S, updates: PROFILE_PROPS, memory: { type: 'array', items: S }, actions: ACTIONS, focus: S }), 2500);
 }
 
+function typeHint(type) {
+  if (type === 'Occasion') { const o = currentOccasion() || upcomingOccasions(60)[0]; return o ? ` Thème : ${o.name}, ${inDays(o.days)} (le ${fdate(iso(o.date))}). Relie l’occasion à une offre concrète de la personne.` : ''; }
+  if (type === 'Objection') { const o = pickObjection(''); return ` Réponds à l’hésitation « ${o.q} » avec empathie, puis avec des faits tirés du profil, sans jamais rabaisser le client.`; }
+  return '';
+}
 async function aiStory(type, subject) {
-  const sys = `${NIA_SYSTEM}\n\nProfil : ${brief()}\n\nÉcris une séquence de 6 stories Instagram de type « ${type} ». Chaque story : t = titre fort (8 mots maximum), s = phrase d’appui (20 mots maximum, peut être vide), c = texte de bouton uniquement sur la dernière story (sinon vide). La séquence raconte une histoire et se termine par un appel à l’action vers ${st.profile.cta || 'Réserver'}.`;
+  const sys = `${NIA_SYSTEM}\n\nProfil : ${brief()}\n\nÉcris une séquence de 6 stories Instagram de type « ${type} ».${typeHint(type)} Chaque story : t = titre fort (8 mots maximum), s = phrase d’appui (20 mots maximum, peut être vide), c = texte de bouton uniquement sur la dernière story (sinon vide). La séquence raconte une histoire et se termine par un appel à l’action vers ${st.profile.cta || 'Réserver'}.`;
   const r = await callClaude('story', sys, [{ role: 'user', content: subject ? `Sujet : ${subject}` : 'Propose le sujet le plus utile pour moi cette semaine.' }], T('nia_stories', 'Séquence de stories', { frames: { type: 'array', minItems: 4, maxItems: 8, items: { type: 'object', properties: { t: S, s: S, c: S }, required: ['t', 's', 'c'] } } }), 2500);
   return r.frames.map(f => ({ t: f.t || '', s: f.s || '', c: f.c || '' }));
 }
 
 async function aiPost(net, format, angle, subject) {
-  const sys = `${NIA_SYSTEM}\n\nProfil : ${brief()}\n\nÉcris un ${format === 'Carrousel' ? 'carrousel de 5 à 7 slides' : 'post avec un seul visuel'} pour ${net}, angle « ${angle} ». Slides : k = petit surtitre en majuscules, t = titre (10 mots maximum), p = phrase d’appui (20 mots maximum). Puis la légende : ${net === 'LinkedIn' ? 'storytelling LinkedIn, 120 à 200 mots, sauts de ligne, une question finale, 3 hashtags maximum' : 'légende Instagram, accroche, 3 à 5 lignes, appel à l’action, 5 à 8 hashtags pertinents dont la ville'}.`;
+  const sys = `${NIA_SYSTEM}\n\nProfil : ${brief()}\n\nÉcris un ${format === 'Carrousel' ? 'carrousel de 5 à 7 slides' : 'post avec un seul visuel'} pour ${net}, angle « ${angle} ».${typeHint(angle)} Slides : k = petit surtitre en majuscules, t = titre (10 mots maximum), p = phrase d’appui (20 mots maximum). Puis la légende : ${net === 'LinkedIn' ? 'storytelling LinkedIn, 120 à 200 mots, sauts de ligne, une question finale, 3 hashtags maximum à la fin' : net === 'TikTok' ? 'légende TikTok courte et directe, 2 à 3 lignes, 3 à 5 hashtags à la fin' : net === 'Facebook' ? 'légende Facebook chaleureuse, 3 à 6 lignes, appel à l’action, 3 hashtags maximum à la fin' : 'légende Instagram, accroche, 3 à 5 lignes, appel à l’action, 3 à 5 hashtags précis à la fin dont un local (Instagram en accepte 5 au maximum)'}.`;
   return callClaude('post', sys, [{ role: 'user', content: subject ? `Sujet : ${subject}` : 'Choisis le sujet le plus utile pour moi.' }], T('nia_post', 'Contenu réseau social', { slides: { type: 'array', minItems: 1, maxItems: 8, items: { type: 'object', properties: { k: S, t: S, p: S }, required: ['k', 't', 'p'] } }, caption: S }), 3000);
 }
 
@@ -141,13 +151,31 @@ async function aiFollow(rule, c, label) {
   return r.message;
 }
 
-async function aiBios() {
-  const sys = `${NIA_SYSTEM}\n\nProfil : ${brief()}\n\nÉcris 3 bios Instagram différentes (150 caractères maximum chacune, espaces et retours à la ligne compris, retours à la ligne autorisés${st.brand.emoji ? ', un emoji maximum par ligne' : ', aucun emoji'}). La dernière ligne invite à l’action avec le bouton choisi : « ${st.profile.cta || 'Réserver'} » et un titre LinkedIn (220 caractères maximum).`;
-  return callClaude('bios', sys, [{ role: 'user', content: 'Mes bios, s’il te plaît.' }], T('nia_bios', 'Bios', { bios: { type: 'array', minItems: 3, maxItems: 3, items: S }, linkedin: S }), 1500);
+async function aiBioPlat(plat) {
+  const m = BIO_PLAT[plat] || BIO_PLAT.instagram;
+  const sys = `${NIA_SYSTEM}\n\nProfil : ${brief()}\n\nÉcris 3 propositions différentes pour : ${m.label}. Limite stricte : ${m.max} caractères chacune, espaces compris.${m.max <= 220 ? ' Retours à la ligne autorisés pour Instagram uniquement.' : ''}${st.brand.emoji ? ' Un emoji maximum par ligne.' : ' Aucun emoji.'} Écris pour le client idéal, dis ce que fait la personne, pour qui, une preuve si possible, et termine par une invitation à agir avec le bouton « ${st.profile.cta || 'Réserver'} » quand le format s’y prête.`;
+  return callClaude('bios', sys, [{ role: 'user', content: 'Mes propositions, s’il te plaît.' }], T('nia_bios', 'Bios', { bios: { type: 'array', minItems: 3, maxItems: 3, items: S } }), 1800);
+}
+
+async function aiICP() {
+  const ans = Object.fromEntries(ICP_Q.map(q => [q.q, icpAnswer(q.k)]));
+  const sys = `${NIA_SYSTEM}\n\nProfil : ${brief()}\n\nRéponses au questionnaire client idéal : ${JSON.stringify(ans)}\n\nStatistiques du CRM : ${JSON.stringify(crmStats())}\n\nDessine 2 profils de clients idéaux, précis et réalistes, le premier étant le principal, plus le profil du client à éviter. Pour chaque profil : un prénom, une tranche d’âge, la situation, ce qui déclenche l’achat, le budget, 3 problèmes et 3 envies formulés avec leurs mots à eux, quelques expressions qu’ils utilisent, 3 hésitations avec la réponse à donner, les plateformes où les trouver, 6 hashtags sans le #, des lieux concrets et des types de comptes qu’ils suivent, et 3 idées de contenus. N’invente aucun chiffre.`;
+  const P2 = { type: 'object', properties: { name: S, age: S, situation: S, trigger: S, budget: S, pains: { type: 'array', items: S }, desires: { type: 'array', items: S }, words: { type: 'array', items: S }, objections: { type: 'array', items: { type: 'object', properties: { q: S, a: S }, required: ['q', 'a'] } }, platforms: { type: 'array', items: S }, hashtags: { type: 'array', items: S }, places: { type: 'array', items: S }, accounts: { type: 'array', items: S }, hooks: { type: 'array', items: S } }, required: ['name', 'age', 'situation', 'trigger', 'budget', 'pains', 'desires', 'objections', 'platforms', 'hooks'] };
+  return callClaude('icp', sys, [{ role: 'user', content: 'Dessine mon client idéal.' }], T('nia_icp', 'Profils clients', { personas: { type: 'array', minItems: 2, maxItems: 3, items: P2 }, anti: { type: 'object', properties: { portrait: S, signals: { type: 'array', items: S }, reply: S }, required: ['portrait', 'signals', 'reply'] } }), 5000);
+}
+
+async function aiVoice(samples) {
+  const sys = `${NIA_SYSTEM}\n\nProfil : ${brief()}\n\nAnalyse la façon d’écrire de la personne à partir de ses textes. Décris sa voix en une phrase (summary), donne 4 à 6 règles à suivre (dos), 3 à 5 choses à éviter (donts), ses mots ou expressions typiques (words), et écris 2 exemples courts dans sa voix (examples) : une accroche de story et un message à un client.`;
+  return callClaude('voice', sys, [{ role: 'user', content: samples.map((s, i) => `Texte ${i + 1} :\n${s}`).join('\n\n') }], T('nia_voix', 'Voix de marque', { summary: S, dos: { type: 'array', items: S }, donts: { type: 'array', items: S }, words: { type: 'array', items: S }, examples: { type: 'array', items: S } }), 2000);
+}
+
+async function aiPitch() {
+  const sys = `${NIA_SYSTEM}\n\nProfil : ${brief()}\n\nÉcris les textes de présentation de la personne, dans sa voix, pour son client idéal : one (une phrase de présentation), thirty (pitch oral de 30 secondes, 70 mots maximum), dm (premier message Instagram chaleureux et non commercial, avec [prénom] et [sujet] à compléter), li (demande de connexion LinkedIn, 280 caractères maximum), wa (description WhatsApp Business, 139 caractères maximum), mail (signature email sur 3 lignes).`;
+  return callClaude('pitch', sys, [{ role: 'user', content: 'Mes pitchs.' }], T('nia_pitch', 'Pitchs', { one: S, thirty: S, dm: S, li: S, wa: S, mail: S }), 2000);
 }
 
 async function aiLanding() {
-  const sys = `${NIA_SYSTEM}\n\nProfil : ${brief()}\n\nÉcris le haut d’une mini landing page qui donne envie de prendre rendez vous : headline (10 mots maximum), sub (30 mots maximum), cta (4 mots maximum).`;
+  const sys = `${NIA_SYSTEM}\n\nProfil : ${brief()}\n\nÉcris le haut de la page lien en bio de la personne, pour son client idéal, qui donne envie de la contacter : headline (10 mots maximum), sub (30 mots maximum), cta (4 mots maximum).`;
   return callClaude('landing', sys, [{ role: 'user', content: 'Ma page.' }], T('nia_landing', 'Textes de la landing page', { headline: S, sub: S, cta: S }), 1000);
 }
 

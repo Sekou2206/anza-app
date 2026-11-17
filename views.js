@@ -18,15 +18,19 @@ VIEWS.accueil = () => {
     ['Faire l’entretien avec Nia', ivDone(), '#/nia'],
     ['Ajouter vos prestations et vos prix', st.services.length > 0, '#/reglages'],
     ['Ajouter votre premier contact', st.clients.length > 0, '#/crm'],
+    ['Dessiner votre client idéal', icpReady(), '#/icp'],
+    ['Importer vos photos et votre logo', st.media.length > 0, '#/photos'],
+    ['Publier votre page lien en bio', !!st.page.published, '#/landing'],
     ['Créer votre première séquence de stories', !!st.storyMade || st.perf.length > 0, '#/stories'],
     ['Envoyer votre premier devis', st.quotes.some(q => q.status !== 'brouillon'), '#/devis/new'],
     ['Installer Anza sur votre téléphone', !!st.installed, '#/reglages']
   ];
-  const left = steps.filter(s => !s[1]).length;
+  const left = steps.filter(s => !s[1]).length, N = netCalc(year), ideas = dailyIdeas(), leads = st.clients.filter(c => c.lead && !c.leadSeen);
   return `
   <div class="head"><div><p class="kick">${fdateL(now)}</p><h1>Bonjour ${esc(p.first || '')}</h1><p>${st.clients.length ? `Voici votre activité aujourd’hui. ${fol.length ? `${plural(fol.length, 'relance vous attend', 'relances vous attendent')}.` : 'Aucune relance en attente.'}` : 'Bienvenue dans votre espace Anza. Suivez les étapes ci dessous pour bien démarrer.'}</p></div>
   <div class="btns"><a class="btn sec" href="#/devis/new">${ic('file')}Nouveau devis</a><button class="btn pri" data-a="newClient">${ic('plus')}Nouveau contact</button></div></div>
   ${has(3) && !aiOn() ? `<div class="card" style="margin-bottom:16px">${connectBox('home')}</div>` : ''}
+  ${leads.length ? `<div class="card blue" style="margin-bottom:16px"><h3>${plural(leads.length, 'nouvelle demande', 'nouvelles demandes')} depuis votre page</h3><ul class="list" style="margin-top:8px">${leads.slice(0, 4).map(c => `<li style="border-color:rgba(255,255,255,.15)"><div class="av" style="background:#fff;color:var(--navy)">${initials(c.name)}</div><div class="grow"><b>${esc(c.name)}</b><small style="color:#C9D6F5">${c.wish ? 'Souhaite un rendez vous le ' + fdateL(c.wish.date) + (c.wish.time ? ' à ' + c.wish.time.replace(':', 'h') : '') : esc((c.notes || 'Demande de contact').slice(0, 60))}</small></div><a class="btn sec sm" href="#/client/${c.id}">Répondre</a></li>`).join('')}</ul></div>` : ''}
   ${left ? `<div class="card" style="margin-bottom:16px"><h3>Bien démarrer <small>${steps.length - left} sur ${steps.length}</small></h3><div class="meter"><i style="width:${(steps.length - left) / steps.length * 100}%"></i></div>
   <ul class="checklist">${steps.map(([t, ok, h]) => `<li class="${ok ? 'ok' : ''}"><span class="ck">${ok ? ic('check') : ''}</span><a href="${h}">${t}</a></li>`).join('')}</ul></div>` : ''}
   <div class="grid g4">
@@ -48,27 +52,28 @@ VIEWS.accueil = () => {
   </div>
   <div class="grid g3" style="margin-top:16px">
     <div class="card"><h3>Prochains rendez vous</h3><ul class="list" style="margin-top:8px">${upcoming.map(c => `<li><div class="av">${initials(c.name)}</div><div class="grow"><b>${esc(c.name)}</b><small>${fdateL(c.next)}</small></div><a class="btn ghost sm" href="#/client/${c.id}">Fiche</a></li>`).join('') || '<li class="mute">Aucun rendez vous prévu. Ajoutez en un depuis la fiche d’un client.</li>'}</ul></div>
-    <div class="card"><h3>Seuil micro entreprise <small>${now.getFullYear()}</small></h3><p style="margin-top:14px;font-size:26px;font-weight:800;letter-spacing:-.04em">${eur(year)}</p><p class="mute" style="font-size:13px">sur ${eur(p.threshold)}, soit ${pct} %</p><div class="meter"><i style="width:${pct}%"></i></div>
-      <div class="tip" style="margin-top:16px"><i>!</i><div>Déclaration ${p.period} à faire avant le <b>${fdate(nextDecl)}</b></div></div></div>
+    <div class="card"><h3>Net en poche <small>${now.getFullYear()}</small> <a class="btn ghost sm" href="#/net">Détail</a></h3><p style="margin-top:14px;font-size:26px;font-weight:800;letter-spacing:-.04em">${eur(N.net)}</p><p class="mute" style="font-size:13px">${eur(year)} encaissés, ${eur(N.cot + N.vl)} de cotisations estimées</p><div class="meter"><i style="width:${pct}%"></i></div><p class="mute" style="font-size:12px;margin-top:6px">${pct} % du plafond de ${eur(p.threshold)}</p>
+      <div class="tip" style="margin-top:12px"><i>!</i><div>Déclaration ${p.period} à faire avant le <b>${fdate(nextDecl)}</b></div></div></div>
     <div class="card ${weeklyDone() ? '' : 'blue'}"><h3>Nia</h3>${weeklyDone() ? `<p class="mute" style="margin-top:12px">Vous avez répondu à la question de la semaine. Nia a mis à jour votre positionnement.</p><a class="btn sec" style="margin-top:16px" href="#/journal">Voir le journal</a>` :
       `<p style="margin-top:12px;font-size:19px;font-weight:700;letter-spacing:-.02em;line-height:1.3">${esc(currentWeeklyQ().q)}</p><p style="margin-top:8px;opacity:.8;font-size:14px">Deux minutes pour répondre : Nia adapte votre profil et planifie vos prochaines publications.</p><a class="btn sec" style="margin-top:16px" href="#/semaine">Répondre</a>`}</div>
   </div>
+  <div class="card" style="margin-top:16px"><h3>Idées du jour <a class="btn ghost sm" href="#/stories">Studio</a></h3><div class="ideas row3" style="margin-top:10px">${ideas.map(x => `<a class="idea" href="${esc(x.h)}"><b>${esc(x.t)}</b><span>${esc(x.w)}</span></a>`).join('')}</div></div>
   <div class="card" style="margin-top:16px"><div class="tip"><i>€</i><div><b>Suivi facturation.</b> La facturation électronique devient obligatoire pour les petites entreprises en France. Anza ne facture pas à votre place : nous vous aidons à choisir votre plateforme agréée et faisons le point avec vous sur vos factures et vos seuils.</div></div></div>`;
 };
 function weekIndex() { return Math.floor(mondayOf(Date.now()).getTime() / (7 * DAY)) % WEEKLY_Q.length; }
 
 VIEWS.crm = () => {
-  if (!st.clients.length) return `<div class="head"><div><p class="kick">CRM</p><h1>Vos clients</h1><p>Tous vos contacts, du premier message au client fidèle.</p></div></div><div class="card empty-big"><h2>Ajoutez votre premier contact</h2><p class="mute">Un message Instagram, une demande WhatsApp, un ancien client : tout le monde a sa place ici. Anza vous dira ensuite qui relancer et quand.</p><button class="btn pri" data-a="newClient">${ic('plus')}Nouveau contact</button></div>`;
+  if (!st.clients.length) return `<div class="head"><div><p class="kick">CRM</p><h1>Vos clients</h1><p>Tous vos contacts, du premier message au client fidèle.</p></div></div><div class="card empty-big"><h2>Ajoutez votre premier contact</h2><p class="mute">Un message Instagram, une demande WhatsApp, un ancien client : tout le monde a sa place ici. Anza vous dira ensuite qui relancer et quand.</p><div class="btns" style="justify-content:center"><button class="btn sec" data-a="quickAdd">${ic('msg')}Depuis un message</button><button class="btn pri" data-a="newClient">${ic('plus')}Nouveau contact</button></div></div>`;
   const mode = route.q.vue || 'liste', f = route.q.f || 'tous';
   const list = st.clients.filter(c => f === 'tous' || c.status === f).sort((a, b) => String(b.lastContact || '').localeCompare(String(a.lastContact || '')));
   const spent = c => c.history.reduce((a, h) => a + (+h.amount || 0), 0);
   const counts = s => st.clients.filter(c => c.status === s).length;
   return `<div class="head"><div><p class="kick">CRM</p><h1>Vos clients</h1><p>Tous vos contacts, du premier message au client fidèle.</p></div>
-  <div class="btns"><div class="seg"><button class="${mode === 'liste' ? 'on' : ''}" data-a="go" data-h="#/crm?vue=liste&f=${f}">Liste</button><button class="${mode === 'pipeline' ? 'on' : ''}" data-a="go" data-h="#/crm?vue=pipeline">Pipeline</button></div><button class="btn pri" data-a="newClient">${ic('plus')}Nouveau contact</button></div></div>
+  <div class="btns"><button class="btn sec" data-a="quickAdd">${ic('msg')}Depuis un message</button><div class="seg"><button class="${mode === 'liste' ? 'on' : ''}" data-a="go" data-h="#/crm?vue=liste&f=${f}">Liste</button><button class="${mode === 'pipeline' ? 'on' : ''}" data-a="go" data-h="#/crm?vue=pipeline">Pipeline</button></div><button class="btn pri" data-a="newClient">${ic('plus')}Nouveau contact</button></div></div>
   ${mode === 'pipeline' ? `<div class="kanban">${Object.keys(STATUS).map(s => `<div class="col" data-drop="${s}"><h4>${STATUS[s]} <span class="mute">${counts(s)}</span></h4>${st.clients.filter(c => c.status === s).map(c => `<div class="kc" data-drag="${c.id}"><b>${esc(c.name)}</b><small>${esc(c.source)} · ${fdate(c.lastContact)}</small><div class="row"><small>${eur(spent(c))}</small><a class="btn ghost sm" href="#/client/${c.id}">Ouvrir</a></div></div>`).join('')}</div>`).join('')}</div><p class="mute" style="margin-top:10px;font-size:13px">Glissez une carte pour changer son étape. Sur téléphone, changez l’étape depuis la fiche du contact.</p>` :
     `<div class="card" style="padding:0"><div style="padding:14px 16px"><div class="seg">${['tous', ...Object.keys(STATUS)].map(s => `<button class="${f === s ? 'on' : ''}" data-a="go" data-h="#/crm?vue=liste&f=${s}">${s === 'tous' ? 'Tous ' + st.clients.length : STATUS[s] + ' ' + counts(s)}</button>`).join('')}</div></div>
     <div class="tablewrap"><table class="table crm-t"><thead><tr><th>Nom</th><th>Étape</th><th>Source</th><th>Dernier contact</th><th>Dépensé</th><th>Prochain rendez vous</th></tr></thead><tbody>
-    ${list.map(c => `<tr class="click" data-a="go" data-h="#/client/${c.id}"><td><div class="row" style="flex-wrap:nowrap"><div class="av">${initials(c.name)}</div><b>${esc(c.name)}</b></div></td><td><span class="tag ${c.status}">${STATUS[c.status]}</span></td><td>${esc(c.source)}</td><td>${fdate(c.lastContact)}</td><td>${eur(spent(c))}</td><td>${c.next ? fdate(c.next) : '<span class="mute">Aucun</span>'}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">Aucun contact ici.</td></tr>'}
+    ${list.map(c => `<tr class="click" data-a="go" data-h="#/client/${c.id}"><td><div class="row" style="flex-wrap:nowrap"><div class="av">${initials(c.name)}</div><b>${esc(c.name)}</b>${c.lead && !c.leadSeen ? '<span class="tag new">Nouveau</span>' : ''}${personaTag(c)}</div></td><td><span class="tag ${c.status}">${STATUS[c.status]}</span></td><td>${esc(c.source)}</td><td>${fdate(c.lastContact)}</td><td>${eur(spent(c))}</td><td>${c.next ? fdate(c.next) : '<span class="mute">Aucun</span>'}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">Aucun contact ici.</td></tr>'}
     </tbody></table></div></div>`}`;
 };
 AFTER.crm = () => dnd((id, s) => {
@@ -76,23 +81,27 @@ AFTER.crm = () => dnd((id, s) => {
   c.status = s; c.lastContact = iso(Date.now()); save(); toast(`${firstName(c.name)} : ${STATUS[c.status]}`); refresh();
 });
 
+function personaTag(c) { const p = c.persona && (st.icp.personas || []).find(x => x.id === c.persona); return p ? `<span class="tag icp" title="Correspond à votre client idéal">${esc(p.name)}</span>` : ''; }
 function clientForm(c) {
   c = c || { name: '', phone: '', email: '', source: 'Instagram', status: 'prospect', notes: '' };
   return `<div class="form"><div class="grid g2"><div class="field"><label for="f-name">Nom</label><input id="f-name" value="${esc(c.name)}" placeholder="Prénom Nom"></div>
   <div class="field"><label for="f-phone">Téléphone</label><input id="f-phone" value="${esc(c.phone)}" placeholder="06 00 00 00 00"></div></div>
   <div class="grid g2"><div class="field"><label for="f-email">Email</label><input id="f-email" value="${esc(c.email)}"></div>
-  <div class="field"><label for="f-source">Source</label><select id="f-source">${['Instagram', 'WhatsApp', 'LinkedIn', 'Bouche à oreille', 'Site', 'Autre'].map(s => `<option ${c.source === s ? 'selected' : ''}>${s}</option>`).join('')}</select></div></div>
-  <div class="field"><label for="f-status">Étape</label><select id="f-status">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${c.status === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
+  <div class="field"><label for="f-source">Source</label><select id="f-source">${['Instagram', 'WhatsApp', 'LinkedIn', 'Facebook', 'TikTok', 'Ma page', 'Bouche à oreille', 'Site', 'Autre'].map(s => `<option ${c.source === s ? 'selected' : ''}>${s}</option>`).join('')}</select></div></div>
+  <div class="grid g2"><div class="field"><label for="f-status">Étape</label><select id="f-status">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${c.status === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
+  <div class="field"><label for="f-persona">Profil client</label><select id="f-persona"><option value="">Non défini</option>${(st.icp.personas || []).map(p => `<option value="${p.id}" ${c.persona === p.id ? 'selected' : ''}>${esc(p.name)}, ${esc(String(p.situation).slice(0, 40))}</option>`).join('')}</select></div></div>
   <div class="field"><label for="f-notes">Notes</label><textarea id="f-notes">${esc(c.notes)}</textarea></div>
   <div class="btns" style="justify-content:flex-end"><button class="btn sec" data-a="close">Annuler</button><button class="btn pri" data-a="saveClient" data-id="${c.id || ''}">Enregistrer</button></div></div>`;
 }
 A.newClient = () => modal('Nouveau contact', clientForm());
+A.quickAdd = () => modal('Ajouter depuis un message', `<div class="form"><p class="mute" style="font-size:14px">Collez le message reçu sur Instagram, WhatsApp ou par email. Anza repère le nom, le téléphone et l’email, et garde le message dans les notes.</p><div class="field"><label for="qa-t">Message</label><textarea id="qa-t" rows="6" placeholder="Bonjour, je m’appelle Sarah, je voudrais un rendez vous…"></textarea></div><div class="field"><label for="qa-s">Reçu sur</label><select id="qa-s">${['Instagram', 'WhatsApp', 'Facebook', 'TikTok', 'LinkedIn', 'Site', 'Autre'].map(s => `<option>${s}</option>`).join('')}</select></div><div class="btns" style="justify-content:flex-end"><button class="btn sec" data-a="close">Annuler</button><button class="btn pri" data-a="quickGo">Continuer</button></div></div>`);
+A.quickGo = () => { const t = val('qa-t').trim(); if (!t) { toast('Collez un message'); return; } const r = parseContact(t), src = val('qa-s'); modal('Nouveau contact', clientForm({ name: r.name ? uc(r.name) : '', phone: r.phone, email: r.email, source: src, status: 'prospect', notes: t.slice(0, 1000) + (r.ig ? `\nInstagram : @${r.ig}` : '') })); };
 A.editClient = el => modal('Modifier le contact', clientForm(clientById(el.dataset.id)));
 A.saveClient = el => {
   const name = val('f-name').trim(); if (!name) { toast('Le nom est obligatoire'); return; }
   let c = clientById(el.dataset.id);
   if (!c) { c = { id: uid(), createdAt: iso(Date.now()), lastContact: iso(Date.now()), next: '', satisfied: false, review: false, history: [] }; st.clients.push(c); }
-  Object.assign(c, { name, phone: val('f-phone'), email: val('f-email'), source: val('f-source'), status: val('f-status'), notes: val('f-notes') });
+  Object.assign(c, { name, phone: val('f-phone'), email: val('f-email'), source: val('f-source'), status: val('f-status'), notes: val('f-notes'), persona: val('f-persona') });
   save(); closeModal(); toast('Contact enregistré'); go('#/client/' + c.id); refresh();
 };
 
@@ -101,8 +110,10 @@ VIEWS.client = () => {
   if (!c) return `<div class="empty">Contact introuvable. <a href="#/crm">Retour aux clients</a></div>`;
   const spent = c.history.reduce((a, h) => a + (+h.amount || 0), 0), visits = c.history.filter(h => h.amount > 0).length;
   const qs = st.quotes.filter(q => q.clientId === c.id);
-  return `<div class="head"><div class="row" style="gap:16px;flex-wrap:nowrap"><div class="av lg">${initials(c.name)}</div><div><p class="kick"><a href="#/crm" style="text-decoration:none">Clients</a></p><h1>${esc(c.name)}</h1><p><select data-c="clientStatus" data-id="${c.id}" class="tag ${c.status}" style="border:0;cursor:pointer">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${c.status === k ? 'selected' : ''}>${v}</option>`).join('')}</select> · ${esc(c.source)} · depuis le ${fdate(c.createdAt)}</p></div></div>
+  if (c.lead && !c.leadSeen) { c.leadSeen = true; save(); }
+  return `<div class="head"><div class="row" style="gap:16px;flex-wrap:nowrap"><div class="av lg">${initials(c.name)}</div><div><p class="kick"><a href="#/crm" style="text-decoration:none">Clients</a></p><h1>${esc(c.name)}</h1><p><select data-c="clientStatus" data-id="${c.id}" class="tag ${c.status}" style="border:0;cursor:pointer">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${c.status === k ? 'selected' : ''}>${v}</option>`).join('')}</select> · ${esc(c.source)} · depuis le ${fdate(c.createdAt)} ${personaTag(c)}</p></div></div>
   <div class="btns"><a class="btn sec" href="${wa(c.phone, `Bonjour ${firstName(c.name)}, `)}" target="_blank" rel="noopener">${ic('wa')}WhatsApp</a><a class="btn sec" href="mailto:${esc(c.email)}">${ic('mail')}Email</a><a class="btn sec" href="#/devis/new?client=${c.id}">${ic('file')}Devis</a><button class="btn sec" data-a="taskNew" data-client="${c.id}">${ic('board')}Tâche</button><button class="btn pri" data-a="addVisit" data-id="${c.id}">${ic('plus')}Ajouter une prestation</button></div></div>
+  ${c.wish ? `<div class="card blue" style="margin-bottom:16px"><h3>Demande de rendez vous</h3><p style="margin-top:8px;font-size:18px;font-weight:700">${fdateL(c.wish.date)}${c.wish.time ? ' à ' + c.wish.time.replace(':', 'h') : ''}</p>${c.notes ? `<p style="opacity:.85;margin-top:6px">${esc(c.notes.slice(0, 240))}</p>` : ''}<div class="btns" style="margin-top:12px"><button class="btn sec sm" data-a="wishOk" data-id="${c.id}">${ic('check')}Confirmer sur WhatsApp</button><a class="btn ghost sm" style="color:#fff" href="${wa(c.phone, V(`Bonjour ${firstName(c.name)}, merci pour votre demande ! Ce créneau n’est plus disponible, je peux vous proposer [jour] à [heure]. Cela vous convient ?`, `Coucou ${firstName(c.name)}, merci pour ta demande ! Ce créneau n’est plus disponible, je peux te proposer [jour] à [heure]. Ça te va ?`))}" target="_blank" rel="noopener">Proposer un autre créneau</a><button class="btn ghost sm" style="color:#fff" data-a="wishDrop" data-id="${c.id}">Ignorer</button></div></div>` : ''}
   <div class="grid g3">
     <div class="card kpi"><p>Dépensé au total</p><strong>${eur(spent)}</strong></div>
     <div class="card kpi"><p>Visites</p><strong>${visits}</strong></div>
@@ -112,18 +123,28 @@ VIEWS.client = () => {
     <div class="card"><h3>Historique</h3><ul class="list" style="margin-top:8px">${c.history.slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))).map(h => `<li><div class="grow"><b>${esc(h.text)}</b><small>${fdateL(h.date)}</small></div><b>${h.amount ? eur(h.amount) : ''}</b></li>`).join('') || '<li class="mute">Pas encore d’historique.</li>'}</ul>
       ${qs.length ? `<h3 style="margin-top:20px">Devis</h3><ul class="list" style="margin-top:8px">${qs.map(q => `<li><div class="grow"><b>${esc(q.num)}</b><small>${fdate(q.date)}</small></div><span class="tag ${q.status}">${QSTATUS[q.status]}</span><b>${eur(quoteTotal(q))}</b><a class="btn ghost sm" href="#/devis/${q.id}">Ouvrir</a></li>`).join('')}</ul>` : ''}</div>
     <div class="grid" style="align-content:start">
-      <div class="card"><h3>Coordonnées <button class="btn ghost sm" data-a="editClient" data-id="${c.id}">Modifier</button></h3><ul class="list" style="margin-top:8px"><li><small class="grow">Téléphone</small><b>${esc(c.phone) || '…'}</b></li><li><small class="grow">Email</small><b>${esc(c.email) || '…'}</b></li><li><small class="grow">Prochain rendez vous</small><input type="date" value="${c.next}" data-c="clientNext" data-id="${c.id}" style="border:1px solid var(--line);border-radius:8px;padding:5px 8px"></li></ul></div>
+      <div class="card"><h3>Coordonnées <button class="btn ghost sm" data-a="editClient" data-id="${c.id}">Modifier</button></h3><ul class="list" style="margin-top:8px"><li><small class="grow">Téléphone</small><b>${esc(c.phone) || '…'}</b></li><li><small class="grow">Email</small><b>${esc(c.email) || '…'}</b></li><li><small class="grow">Prochain rendez vous</small><input type="date" value="${c.next}" data-c="clientNext" data-id="${c.id}" style="border:1px solid var(--line);border-radius:8px;padding:5px 8px" aria-label="Date du prochain rendez vous"><input type="time" value="${c.nextTime || ''}" data-c="clientNextTime" data-id="${c.id}" style="border:1px solid var(--line);border-radius:8px;padding:5px 8px;width:96px" aria-label="Heure"></li></ul></div>
       <div class="card"><h3>Notes</h3><textarea data-i="clientNotes" data-id="${c.id}" style="margin-top:10px;width:100%;min-height:110px;border:1px solid var(--line);border-radius:10px;padding:10px" placeholder="Préférences, allergies, détails utiles">${esc(c.notes)}</textarea></div>
       <div class="card"><h3>Satisfaction</h3>
         <label class="row" style="margin-top:12px;flex-wrap:nowrap"><input type="checkbox" ${c.satisfied ? 'checked' : ''} data-c="clientFlag" data-k="satisfied" data-id="${c.id}"> Client satisfait</label>
         <label class="row" style="margin-top:8px;flex-wrap:nowrap"><input type="checkbox" ${c.review ? 'checked' : ''} data-c="clientFlag" data-k="review" data-id="${c.id}"> Avis laissé</label>
-        ${c.satisfied ? `<div class="tip" style="margin-top:14px"><i>★</i><div>Un client satisfait, c’est votre meilleure publicité.<br><a class="btn pri sm" style="margin-top:10px" href="#/stories?type=Preuve&subj=${encodeURIComponent(firstName(c.name))}">Créer une story avis</a></div></div>` : ''}</div>
+        ${c.satisfied ? `<div class="tip" style="margin-top:14px"><i>★</i><div>Un client satisfait, c’est votre meilleure publicité.<div class="btns" style="margin-top:10px">${st.profile.googleReview && !c.review ? `<a class="btn pri sm" href="${wa(c.phone, followMessage('avis', c))}" target="_blank" rel="noopener" data-a="reviewAsk" data-id="${c.id}" data-keep="1">${ic('star')}Demander un avis Google</a>` : ''}<a class="btn ${st.profile.googleReview && !c.review ? 'sec' : 'pri'} sm" href="#/stories?type=Preuve&subj=${encodeURIComponent(firstName(c.name))}" data-a="storyDoneFlag" data-id="${c.id}" data-keep="1">Créer une story avis</a></div>${st.profile.googleReview ? '' : '<small class="mute" style="display:block;margin-top:8px">Ajoutez le lien de votre fiche Google dans les Réglages pour demander un avis en un clic.</small>'}</div></div>` : ''}</div>
       <button class="btn danger" data-a="delClient" data-id="${c.id}">Supprimer ce contact</button>
     </div>
   </div>`;
 };
 C.clientStatus = el => { const c = clientById(el.dataset.id); c.status = el.value; c.lastContact = iso(Date.now()); save(); toast('Étape mise à jour'); refresh(); };
 C.clientNext = el => { const c = clientById(el.dataset.id); c.next = el.value; save(); toast('Rendez vous enregistré'); };
+C.clientNextTime = el => { const c = clientById(el.dataset.id); c.nextTime = /^\d{2}:\d{2}$/.test(el.value) ? el.value : ''; save(); toast('Heure enregistrée'); };
+A.wishOk = el => {
+  const c = clientById(el.dataset.id); if (!c || !c.wish) return;
+  const msg = V(`Bonjour ${firstName(c.name)}, c’est confirmé : je vous attends le ${fdateL(c.wish.date)}${c.wish.time ? ' à ' + c.wish.time.replace(':', 'h') : ''}. À très vite !`, `Coucou ${firstName(c.name)}, c’est confirmé : je t’attends le ${fdateL(c.wish.date)}${c.wish.time ? ' à ' + c.wish.time.replace(':', 'h') : ''}. À très vite !`);
+  if (c.phone) window.open(wa(c.phone, msg), '_blank', 'noopener'); else if (c.email) location.href = `mailto:${encodeURIComponent(c.email)}?subject=${encodeURIComponent('Votre rendez vous')}&body=${encodeURIComponent(msg)}`;
+  c.next = c.wish.date; c.nextTime = c.wish.time || ''; c.wish = null; c.lastContact = iso(Date.now()); save(); toast('Rendez vous confirmé'); refresh();
+};
+A.wishDrop = el => { const c = clientById(el.dataset.id); if (c) { c.wish = null; save(); refresh(); } };
+A.reviewAsk = el => { const c = clientById(el.dataset.id); if (c) { st.done.push({ cid: c.id, rule: 'avis', date: iso(Date.now()) }); c.review = true; c.lastContact = iso(Date.now()); save(); setTimeout(refresh, 300); } };
+A.storyDoneFlag = el => { const c = clientById(el.dataset.id); if (c) { c.storyDone = true; save(); } };
 I.clientNotes = el => { const c = clientById(el.dataset.id); c.notes = el.value; save(); };
 C.clientFlag = el => { const c = clientById(el.dataset.id); c[el.dataset.k] = el.checked; save(); refresh(); };
 A.delClient = el => confirmBox('Supprimer ce contact et son historique ?', 'Supprimer', () => { st.clients = st.clients.filter(c => c.id !== el.dataset.id); save(); toast('Contact supprimé'); go('#/crm'); });
@@ -162,7 +183,8 @@ A.followAI = async el => {
   el.disabled = false; el.lastChild.textContent = 'Réécrire avec Nia';
 };
 function finishFollow(id, rule) {
-  const c = clientById(id); st.done.push({ cid: id, rule, date: iso(Date.now()) });
+  const c = clientById(id); st.done.push(Object.assign({ cid: id, rule, date: iso(Date.now()) }, rule === 'rappel' ? { ref: c.next } : {}));
+  if (rule === 'rappel') { st.done = st.done.slice(-400); save(); return; }
   if (rule === 'avis') c.review = true;
   c.lastContact = iso(Date.now()); save();
 }
@@ -196,6 +218,8 @@ function quoteEditor() {
     <div class="field"><label>Prestations</label><div class="lines">${q.lines.map((l, i) => `<div class="ln"><input value="${esc(l.name)}" data-i="qLine" data-n="${i}" data-k="name" aria-label="Prestation"><input type="number" min="1" value="${l.qty}" data-i="qLine" data-n="${i}" data-k="qty" aria-label="Quantité"><input type="number" step="0.5" value="${l.price}" data-i="qLine" data-n="${i}" data-k="price" aria-label="Prix"><b class="tt" style="text-align:right">${eur(l.qty * l.price)}</b><button class="x" data-a="qDel" data-n="${i}" aria-label="Retirer">×</button></div>`).join('')}</div>
     <select data-c="qAdd" style="margin-top:6px;border:1px dashed var(--line);border-radius:10px;padding:9px 12px;background:#fff"><option value="">Ajouter une prestation</option>${st.services.map(s => `<option value="${s.id}">${esc(s.name)}, ${eur(s.price)}</option>`).join('')}</select></div>
     <div class="grid g2"><div class="field"><label for="q-r">Remise en %</label><input id="q-r" type="number" min="0" max="100" value="${q.discount}" data-i="qField" data-k="discount"></div><div class="field"><label for="q-d">Date</label><input id="q-d" type="date" value="${q.date}" data-c="qField" data-k="date"></div></div>
+    <div class="grid g2"><div class="field"><label for="q-dp">Acompte demandé</label><select id="q-dp" data-c="qDep">${[0, 20, 30, 40, 50].map(n => `<option value="${n}" ${+q.deposit === n ? 'selected' : ''}>${n ? n + ' %, ' + eur(quoteTotal(q) * n / 100) : 'Pas d’acompte'}</option>`).join('')}</select>${q.deposit && !st.profile.payLink ? '<small>Ajoutez votre lien de paiement dans les Réglages pour qu’il soit payé en un clic.</small>' : ''}</div>
+    <div class="field"><label>&nbsp;</label>${q.deposit ? `<label class="row"><input type="checkbox" ${q.depositPaid ? 'checked' : ''} data-c="qDepPaid"> Acompte reçu</label>` : ''}</div></div>
     <div class="field"><label for="q-n">Message</label><textarea id="q-n" data-i="qField" data-k="note">${esc(q.note)}</textarea></div>
     <div class="field"><label>Statut</label><div class="seg">${Object.entries(QSTATUS).map(([k, v]) => `<button class="${q.status === k ? 'on' : ''}" data-a="qStatus" data-s="${k}">${v}</button>`).join('')}</div><small>Accepté ajoute la prestation à l’historique du client.</small></div>
     ${route.id !== 'new' ? '<button class="btn danger" data-a="qRemove">Supprimer ce devis</button>' : ''}
@@ -209,6 +233,7 @@ function quoteDoc(q) {
   <p><b>Pour :</b> ${esc(c.name)}<br><span class="mute">${esc(c.email)} · ${esc(c.phone)}</span></p>
   <table><thead><tr><th>Prestation</th><th class="r">Qté</th><th class="r">Prix</th><th class="r">Total</th></tr></thead><tbody>${q.lines.map(l => `<tr><td>${esc(l.name)}</td><td class="r">${l.qty}</td><td class="r">${eur(l.price)}</td><td class="r">${eur(l.qty * l.price)}</td></tr>`).join('')}</tbody></table>
   <div class="tot"><div><p><span>Sous total</span><span>${eur(sub)}</span></p>${+q.discount ? `<p><span>Remise ${q.discount} %</span><span>${eur(tot - sub)}</span></p>` : ''}<p class="b"><span>Total</span><span>${eur(tot)}</span></p></div></div>
+  ${+q.deposit ? `<p style="margin-top:14px"><b>Acompte à la réservation : ${eur(tot * q.deposit / 100)}</b> (${q.deposit} %)${q.depositPaid ? ', reçu' : ''}. Solde de ${eur(tot - tot * q.deposit / 100)} le jour de la prestation.${st.profile.payLink && !q.depositPaid ? `<br><span class="mute">Paiement sécurisé : ${esc(st.profile.payLink)}</span>` : ''}</p>` : ''}
   ${q.note ? `<p style="margin-top:16px">${esc(q.note)}</p>` : ''}
   <p class="mute" style="margin-top:22px;font-size:11px">${p.vatNote ? 'TVA non applicable, article 293 B du CGI. ' : ''}Bon pour accord : date et signature.</p></div>`;
 }
@@ -216,6 +241,8 @@ function redrawDoc() { const d = $('#qdoc'); if (d) d.innerHTML = quoteDoc(draft
 I.qLine = el => { const l = draft.lines[+el.dataset.n]; l[el.dataset.k] = el.dataset.k === 'name' ? el.value : +el.value || 0; redrawDoc(); };
 I.qField = el => { draft[el.dataset.k] = el.dataset.k === 'discount' ? +el.value || 0 : el.value; redrawDoc(); };
 C.qField = el => { draft[el.dataset.k] = el.value; redrawDoc(); };
+C.qDep = el => { draft.deposit = +el.value || 0; if (!draft.deposit) draft.depositPaid = false; refresh(); };
+C.qDepPaid = el => { draft.depositPaid = el.checked; A.saveQuote(null, true); };
 C.qAdd = el => { const s = st.services.find(x => x.id === el.value); if (!s) return; draft.lines.push({ sid: s.id, name: s.name, qty: 1, price: s.price }); refresh(); };
 A.qDel = el => { draft.lines.splice(+el.dataset.n, 1); refresh(); };
 A.qStatus = el => { draft.status = el.dataset.s; A.saveQuote(null, true); };
@@ -234,7 +261,8 @@ A.saveQuote = (el, quiet) => {
 A.printQuote = () => { window.print(); };
 A.waQuote = () => {
   const c = clientById(draft.clientId); if (!c) return;
-  const t = `Bonjour ${firstName(c.name)}, voici votre devis ${draft.num} :\n${draft.lines.map(l => `• ${l.name} x${l.qty} : ${eur(l.qty * l.price)}`).join('\n')}\nTotal : ${eur(quoteTotal(draft))}\n\n${draft.note || ''}\n${st.profile.business}`;
+  const tot = quoteTotal(draft), dep = +draft.deposit ? tot * draft.deposit / 100 : 0;
+  const t = `Bonjour ${firstName(c.name)}, voici votre devis ${draft.num} :\n${draft.lines.map(l => `• ${l.name} x${l.qty} : ${eur(l.qty * l.price)}`).join('\n')}\nTotal : ${eur(tot)}${dep ? `\n\nPour confirmer, un acompte de ${eur(dep)} (${draft.deposit} %) est demandé${st.profile.payLink ? ` : ${st.profile.payLink}` : '.'}` : ''}\n\n${draft.note || ''}\n${st.profile.business}`;
   window.open(wa(c.phone, t), '_blank', 'noopener');
   if (draft.status === 'brouillon') { draft.status = 'envoye'; A.saveQuote(null, true); }
 };
@@ -419,41 +447,6 @@ VIEWS.journal = () => {
   <div class="card"><h3>Ce que Nia retient</h3><ul class="learn" style="margin-top:8px">${mem.slice(0, 12).map(m => `<li><b>${fdate(m.date)}</b>${esc(m.text)}</li>`).join('') || '<li class="mute">Rien pour l’instant.</li>'}</ul></div></div></div>`;
 };
 
-let gen = null;
-VIEWS.stories = () => {
-  const type = route.q.type || (gen && gen.type) || 'Offre', style = (gen && gen.style) || 'Bleu', subj = route.q.subj != null ? route.q.subj : (gen && gen.subj) || '';
-  if (!gen || gen.type !== type || route.q.subj != null && gen.subj !== subj) gen = { type, style, subj, frames: storyFrames(type, subj) };
-  const c = palette(gen.style);
-  return `<div class="head"><div><p class="kick">Attirer</p><h1>Séquenceur de stories</h1><p>Une idée, un type d’histoire : Anza écrit six stories qui racontent et qui vendent, dans votre ton. Cliquez sur un texte pour le modifier.</p></div>
-  <div class="btns"><button class="btn sec" data-a="storyCal">${ic('cal')}Planifier</button><button class="btn pri" data-a="storyDl">${ic('dl')}Télécharger les images</button></div></div>
-  <div class="grid g12"><div class="card"><div class="form">
-    <div class="field"><label>Type d’histoire</label><div class="seg">${STORY_TYPES.map(t => `<button class="${gen.type === t ? 'on' : ''}" data-a="storyType" data-t="${t}">${t}</button>`).join('')}</div></div>
-    <div class="field"><label for="sj">Sujet ou détail</label><input id="sj" value="${esc(gen.subj)}" placeholder="${gen.type === 'Preuve' ? 'Prénom du client' : 'Exemple : places du mois de mars'}"><small>Facultatif. Laissez vide pour la version de base.</small></div>
-    <div class="field"><label>Style</label><div class="seg">${['Bleu', 'Nuit', 'Clair'].map(t => `<button class="${gen.style === t ? 'on' : ''}" data-a="storyStyle" data-t="${t}">${t}</button>`).join('')}</div></div>
-    <button class="btn pri" data-a="storyGen" ${busy ? 'disabled' : ''}>${ic('spark')}${busy ? 'Nia écrit' : aiOn() ? 'Écrire avec Nia' : 'Écrire la séquence'}</button>
-    <div class="tip"><i>N</i><div>${st.profile.value ? `Nia s’appuie sur votre promesse : « ${esc(st.profile.value)} ».` : 'Faites l’entretien avec Nia pour des textes vraiment personnalisés.'}</div></div></div></div>
-  <div class="card ${busy ? 'loading' : ''}"><h3>Votre séquence <small>${gen.frames.length} stories ${gen.ai ? '· écrite par Nia avec ' + AI_NAME : ''}</small></h3><div class="frames" style="margin-top:14px">${gen.frames.map((f, i) => `<div class="frame" style="background:${c.bg};color:${c.fg};font-family:${fontFam()}"><div class="bars2">${gen.frames.map((x, k) => `<i class="${k <= i ? 'on' : ''}"></i>`).join('')}</div><p class="who">${esc(P().handle)}</p><span class="num">${i + 1}</span>
-  <p class="ft" contenteditable="true" data-i="frameEdit" data-n="${i}" data-k="t">${esc(f.t)}</p>${f.s ? `<p class="fs" contenteditable="true" data-i="frameEdit" data-n="${i}" data-k="s">${esc(f.s)}</p>` : ''}${f.c ? `<p class="fc" style="background:${c.cb};color:${c.cf}">${esc(f.c)}</p>` : ''}</div>`).join('')}</div></div></div>`;
-};
-A.storyType = el => { gen.type = el.dataset.t; gen.subj = val('sj'); gen.frames = storyFrames(gen.type, gen.subj); history.replaceState(null, '', '#/stories'); route.q = {}; refresh(); };
-A.storyStyle = el => { gen.style = el.dataset.t; refresh(); };
-A.storyGen = async () => {
-  if (busy) return; gen.subj = val('sj'); history.replaceState(null, '', '#/stories'); route.q = {};
-  if (aiOn()) { busy = true; refresh(); try { gen.frames = await aiStory(gen.type, gen.subj); gen.ai = true; busy = false; refresh(); toast('Séquence écrite par Nia'); return; } catch (e) { busy = false; toast(aiError(e)); } }
-  gen.frames = storyFrames(gen.type, gen.subj); gen.ai = false; refresh(); toast('Séquence écrite');
-};
-I.frameEdit = el => { gen.frames[+el.dataset.n][el.dataset.k] = el.textContent; };
-A.storyDl = () => {
-  if (!st.storyMade) { st.storyMade = true; save(); }
-  const imgs = gen.frames.map((f, i) => drawStory(f, i, gen.frames.length, gen.style));
-  showImages(imgs, `story-${gen.type.toLowerCase().replace(/\s/g, '-')}`, '9/16');
-};
-A.storyCal = () => planModal('Story', gen.type, 'Story ' + gen.type.toLowerCase() + ', ' + gen.frames[0].t);
-function showImages(imgs, base, ratio) {
-  window._imgs = { imgs, base };
-  modal('Vos images', `<p class="mute" style="margin-bottom:14px">Format prêt pour Instagram et LinkedIn. Cliquez sur une image pour la télécharger.</p><div class="frames">${imgs.map((d, i) => `<a href="${d}" download="${base}-${i + 1}.png" data-keep="1" style="aspect-ratio:${ratio};border-radius:12px;overflow:hidden;display:block"><img src="${d}" alt="Image ${i + 1}" style="width:100%;height:100%;object-fit:cover"></a>`).join('')}</div><div class="btns" style="margin-top:16px;justify-content:flex-end"><button class="btn pri" data-a="dlAll">${ic('dl')}Tout télécharger</button></div>`, true);
-}
-A.dlAll = () => { const { imgs, base } = window._imgs; imgs.forEach((d, i) => setTimeout(() => download(`${base}-${i + 1}.png`, d), i * 350)); };
 function planModal(type, angle, title, pick) {
   window._plan = { type, angle, title, pick: !!pick };
   const kinds = [['Story', 'Story'], ['Carrousel', 'Carrousel Instagram'], ['LinkedIn', 'Post LinkedIn']];
@@ -470,39 +463,6 @@ A.planSave = () => {
   save(); closeModal(); toast('Ajouté au calendrier le ' + fdateL(date));
   if (route.name === 'calendrier' || route.name === 'accueil') refresh();
 };
-
-let pgen = null;
-VIEWS.posts = () => {
-  if (!pgen) pgen = { net: 'Instagram', format: 'Carrousel', angle: 'Erreurs', subj: '', style: 'Bleu' };
-  if (route.q.angle) { pgen.angle = route.q.angle; pgen.net = route.q.net || pgen.net; if (route.q.subj) pgen.subj = route.q.subj; pgen.ai = false; }
-  const key = [pgen.net, pgen.format, pgen.angle, pgen.subj, st.profile.tone].join('|');
-  if (!pgen.out || pgen.key !== key) { pgen.out = postContent(pgen.net, pgen.format, pgen.angle, pgen.subj); pgen.key = key; }
-  const out = pgen.out, font = fontFam();
-  return `<div class="head"><div><p class="kick">Attirer</p><h1>Carrousels et posts</h1><p>Pour Instagram et LinkedIn, à votre charte et dans votre ton. Choisissez un angle, Anza écrit les slides et la légende. Cliquez sur un texte pour le modifier.</p></div>
-  <div class="btns"><button class="btn sec" data-a="postCal">${ic('cal')}Planifier</button><button class="btn pri" data-a="postDl">${ic('dl')}Télécharger ${out.slides.length > 1 ? 'les slides' : 'l’image'}</button></div></div>
-  <div class="grid g12"><div class="card"><div class="form">
-    <div class="field"><label>Réseau</label><div class="seg">${['Instagram', 'LinkedIn'].map(t => `<button class="${pgen.net === t ? 'on' : ''}" data-a="pSet" data-k="net" data-v="${t}">${t}</button>`).join('')}</div></div>
-    <div class="field"><label>Format</label><div class="seg">${['Carrousel', 'Post'].map(t => `<button class="${pgen.format === t ? 'on' : ''}" data-a="pSet" data-k="format" data-v="${t}">${t}</button>`).join('')}</div></div>
-    <div class="field"><label>Angle</label><div class="seg">${ANGLES.map(t => `<button class="${pgen.angle === t ? 'on' : ''}" data-a="pSet" data-k="angle" data-v="${t}">${t}</button>`).join('')}</div></div>
-    <div class="field"><label for="psj">Titre personnalisé</label><input id="psj" value="${esc(pgen.subj)}" placeholder="Laissez vide pour la proposition de Nia"></div>
-    <div class="field"><label>Style</label><div class="seg">${['Bleu', 'Nuit', 'Clair'].map(t => `<button class="${pgen.style === t ? 'on' : ''}" data-a="pStyle" data-v="${t}">${t}</button>`).join('')}</div></div>
-    <button class="btn pri" data-a="pGen" ${busy ? 'disabled' : ''}>${ic('spark')}${busy ? 'Nia écrit' : aiOn() ? 'Écrire avec Nia' : 'Réécrire'}</button>
-    ${pgen.angle === 'Preuve' ? '<div class="tip"><i>!</i><div>Collez les vrais mots de vos clients dans les slides, avec leur accord.</div></div>' : ''}</div></div>
-  <div class="grid" style="align-content:start"><div class="card ${busy ? 'loading' : ''}"><h3>Slides <small>${out.slides.length} ${pgen.ai ? '· écrites par Nia avec ' + AI_NAME : ''}</small></h3><div class="slides" style="margin-top:14px">${out.slides.map((s, i) => { const c = palette(i === 0 ? pgen.style : (i % 2 ? 'Clair' : pgen.style)); return `<div class="slide" style="background:${c.bg};color:${c.fg};font-family:${font}"><small>${esc(s.k)}</small><b contenteditable="true" data-i="slideEdit" data-n="${i}" data-k="t">${esc(s.t)}</b><p contenteditable="true" data-i="slideEdit" data-n="${i}" data-k="p">${esc(s.p)}</p></div>`; }).join('')}</div></div>
-  <div class="card"><h3>Légende ${pgen.net} <button class="btn sec sm" data-a="copyCap">${ic('copy')}Copier</button></h3><textarea class="caption" id="cap" data-i="capEdit" style="width:100%;border:0;min-height:260px;margin-top:12px;font:inherit">${esc(out.caption)}</textarea></div></div></div>`;
-};
-A.pSet = el => { pgen[el.dataset.k] = el.dataset.v; pgen.ai = false; pgen.subj = val('psj'); history.replaceState(null, '', '#/posts'); route.q = {}; refresh(); };
-A.pStyle = el => { pgen.style = el.dataset.v; refresh(); };
-A.pGen = async () => {
-  if (busy) return; pgen.subj = val('psj'); history.replaceState(null, '', '#/posts'); route.q = {};
-  if (aiOn()) { busy = true; refresh(); try { const r = await aiPost(pgen.net, pgen.format, pgen.angle, pgen.subj); pgen.out = { slides: r.slides.map(x => ({ k: x.k || '', t: x.t || '', p: x.p || '' })), caption: r.caption || '' }; pgen.key = [pgen.net, pgen.format, pgen.angle, pgen.subj, st.profile.tone].join('|'); pgen.ai = true; busy = false; refresh(); toast('Contenu écrit par Nia'); return; } catch (e) { busy = false; toast(aiError(e)); } }
-  pgen.key = null; pgen.ai = false; refresh(); toast('Contenu réécrit');
-};
-I.slideEdit = el => { pgen.out.slides[+el.dataset.n][el.dataset.k] = el.textContent; };
-I.capEdit = el => { pgen.out.caption = el.value; };
-A.copyCap = () => copyText(pgen.out.caption);
-A.postDl = () => { const s = pgen.out.slides; showImages(s.map((x, i) => drawSlide(x, i, s.length, pgen.style)), `${pgen.net.toLowerCase()}-${pgen.angle.toLowerCase()}`, '4/5'); };
-A.postCal = () => planModal(pgen.net === 'LinkedIn' ? 'LinkedIn' : pgen.format === 'Carrousel' ? 'Carrousel' : 'Story', pgen.angle, (pgen.net === 'LinkedIn' ? 'Post LinkedIn, ' : 'Carrousel, ') + pgen.out.slides[0].t);
 
 VIEWS.calendrier = () => {
   const start = mondayOf(Date.now()), today = iso(Date.now());
@@ -556,65 +516,9 @@ VIEWS.bilan = () => {
   <div class="card" style="margin-top:16px"><h3>La séquence</h3><div class="frames" style="margin-top:14px">${frames.map((f, i) => `<div class="frame" style="background:${c.bg};color:${c.fg}"><div class="bars2">${frames.map((x, k) => `<i class="${k <= i ? 'on' : ''}"></i>`).join('')}</div><p class="who">${esc(P().handle)}</p><p class="ft">${esc(f.t)}</p><p class="fs">${esc(f.s)}</p>${f.c ? `<p class="fc" style="background:${c.cb};color:${c.cf}">${esc(f.c)}</p>` : ''}</div>`).join('')}</div></div>`;
 };
 C.hideAmounts = el => { hideAmounts = el.checked; refresh(); };
-A.bilanDl = () => { const f = window._bilan; showImages(f.map((x, i) => drawStory(x, i, f.length, 'Nuit')), 'bilan-du-mois', '9/16'); };
+A.bilanDl = () => openPublish({ kind: 'story', items: window._bilan.map(x => Object.assign({}, x)), style: 'Nuit', base: 'bilan-du-mois', caption: '' });
 
-let bioIdx = 0;
-VIEWS.charte = () => {
-  const b = st.brand, p = st.profile, list = aiBiosOk() ? st.aiBios.bios : bios(), bio = fitBio(list[bioIdx % list.length], 150), li = aiBiosOk() && st.aiBios.linkedin ? tidy(st.aiBios.linkedin) : linkedinHeadline();
-  return `<div class="head"><div><p class="kick">Attirer</p><h1>Charte et bio</h1><p>Vos couleurs, votre police et votre ton, enregistrés une fois. Tout ce qu’Anza produit les respecte.</p></div></div>
-  <div class="grid g2"><div class="card"><h3>Couleurs</h3><div class="row" style="margin-top:14px;gap:18px">${[['primary', 'Principale'], ['accent', 'Accent'], ['soft', 'Douce'], ['ink', 'Texte']].map(([k, l]) => `<label style="text-align:center;font-size:12px;font-weight:600"><div class="swatch" style="margin:0 auto 6px"><input type="color" value="${b[k]}" data-c="set" data-path="brand.${k}" data-live="1" aria-label="${l}"></div>${l}</label>`).join('')}</div>
-    <div class="form" style="margin-top:20px"><div class="field"><label>Police</label><div class="seg">${['Inter', 'Serif'].map(f => `<button class="${b.font === f ? 'on' : ''}" data-a="setFont" data-f="${f}" style="font-family:${f === 'Serif' ? 'Georgia,serif' : 'Inter'}">${f === 'Serif' ? 'Élégante' : 'Moderne'}</button>`).join('')}</div></div>
-    <div class="field"><label>Vous ou tu</label><div class="seg">${[['vous', 'Vouvoiement'], ['tu', 'Tutoiement']].map(([k, l]) => `<button class="${p.tone === k ? 'on' : ''}" data-a="setTone" data-t="${k}">${l}</button>`).join('')}</div></div>
-    <label class="row"><input type="checkbox" ${b.emoji ? 'checked' : ''} data-c="set" data-path="brand.emoji"> Utiliser des emojis</label>
-    <div class="field"><label for="cta">Bouton d’action</label><input id="cta" value="${esc(p.cta || '')}" data-i="set" data-path="profile.cta"></div></div>
-    <div class="prev3">${['Bleu', 'Nuit', 'Clair'].map(s => { const c = palette(s); return `<div style="aspect-ratio:9/16;border-radius:12px;background:${c.bg};color:${c.fg};padding:12px;display:flex;flex-direction:column;font-family:${b.font === 'Serif' ? 'Georgia,serif' : 'Inter'}"><b style="margin-top:auto;font-size:15px;line-height:1.1">${esc(tidy(dot(p.value)))}</b><span style="margin-top:8px;border-radius:12px;background:${c.cb};color:${c.cf};font-size:10px;font-weight:700;text-align:center;padding:6px">${esc(p.cta || 'Réserver')}</span></div>`; }).join('')}</div></div>
-  <div class="grid" style="align-content:start"><div class="card"><h3>Bio Instagram <div class="btns">${aiOn() ? `<button class="btn ghost sm" data-a="bioAI" ${busy ? 'disabled' : ''}>${ic('spark')}${busy ? 'Nia écrit' : 'Écrire avec Nia'}</button>` : ''}<button class="btn ghost sm" data-a="bioNext">Autre version</button><button class="btn sec sm" data-a="copyBio">${ic('copy')}Copier</button></div></h3>
-    <div class="bio" style="margin-top:14px"><div class="igh"><div class="ring"><div>${initials(p.business)}</div></div><div><b>${esc(p.instagram)}</b><div class="mute" style="font-size:13px">${esc(p.business)}</div></div></div><p style="white-space:pre-line;margin-top:12px;font-size:14px">${esc(bio)}</p><p style="color:var(--navy);font-weight:600;font-size:14px;margin-top:4px">Votre lien en bio</p></div>
-    <p class="mute" style="font-size:12px;margin-top:8px">${[...bio].length} caractères sur 150, la limite d’Instagram</p></div>
-    <div class="card"><h3>Titre LinkedIn <button class="btn sec sm" data-a="copyLi">${ic('copy')}Copier</button></h3><p style="margin-top:12px;font-weight:600">${esc(li)}</p></div></div></div>`;
-};
-A.setFont = el => { st.brand.font = el.dataset.f; save(); refresh(); };
-A.setTone = el => { st.profile.tone = el.dataset.t; save(); refresh(); };
-A.bioNext = () => { bioIdx++; refresh(); };
-function aiBiosOk() { const a = st.aiBios; return !!(a && a.bios && a.bios.length && a.cta === (st.profile.cta || '') && a.emoji === !!st.brand.emoji); }
-A.copyBio = () => { const l = aiBiosOk() ? st.aiBios.bios : bios(); copyText(fitBio(l[bioIdx % l.length], 150)); };
-A.copyLi = () => copyText(aiBiosOk() && st.aiBios.linkedin ? tidy(st.aiBios.linkedin) : linkedinHeadline());
-A.bioAI = async () => { if (busy) return; busy = true; refresh(); try { const r = await aiBios(); st.aiBios = { bios: (r.bios || []).filter(Boolean).slice(0, 3).map(x => fitBio(x, 150)), linkedin: r.linkedin || '', cta: st.profile.cta || '', emoji: !!st.brand.emoji }; bioIdx = 0; save(); toast('Bios écrites par Nia'); } catch (e) { toast(aiError(e)); } busy = false; refresh(); };
-
-let lp = null;
-function lpDefault() { const q = P(); return { headline: uc(q.value), sub: `${uc(q.activity)}, ${q.city}. ${dot(q.proof)}`, cta: st.profile.cta || (st.profile.phone ? 'Réserver sur WhatsApp' : 'Me contacter') }; }
-VIEWS.landing = () => {
-  if (!has(2)) return lockView(2, 'La mini landing page est dans la Boutique', 'Une page à votre image, prête à recevoir vos demandes de rendez vous. Incluse dans la Boutique et le Magasin.');
-  if (!lp) lp = st.lp ? Object.assign({}, st.lp) : lpDefault();
-  return `<div class="head"><div><p class="kick">Boutique</p><h1>Votre mini landing page</h1><p>Construite à partir de votre profil, de votre charte et de vos prestations. Mettez la en lien dans votre bio.</p></div>
-  <div class="btns">${aiOn() ? `<button class="btn sec" data-a="lpAI" ${busy ? 'disabled' : ''}>${ic('spark')}${busy ? 'Nia écrit' : 'Écrire avec Nia'}</button>` : ''}<button class="btn sec" data-a="lpOpen">Ouvrir en grand</button><button class="btn pri" data-a="lpDl">${ic('dl')}Télécharger le fichier</button></div></div>
-  <div class="grid g12"><div class="card"><div class="form"><div class="field"><label for="lp-h">Titre</label><input id="lp-h" value="${esc(lp.headline)}" data-i="lp" data-k="headline"></div><div class="field"><label for="lp-s">Sous titre</label><textarea id="lp-s" data-i="lp" data-k="sub">${esc(lp.sub)}</textarea></div><div class="field"><label for="lp-c">Bouton</label><input id="lp-c" value="${esc(lp.cta)}" data-i="lp" data-k="cta"></div>
-  <div class="tip"><i>✓</i><div>Les prestations viennent de vos réglages, les couleurs de votre charte. Le bouton ouvre WhatsApp avec un message prêt.</div></div></div></div>
-  ${lpOfferCard()}
-  <div class="lp-frame"><div class="lp-bar"><i></i><i></i><i></i><span>Aperçu de votre page</span></div><iframe id="lpf" title="Aperçu de la landing page" style="width:100%;height:620px;border:0;display:block"></iframe></div></div>`;
-};
-AFTER.landing = () => { const f = $('#lpf'); if (f) f.srcdoc = landingHTML(lp); if (aiOn() && has(2) && !busy && !(st.lp && st.lp.ai) && !autoTried.lp) { autoTried.lp = true; A.lpAI(); } };
 const autoTried = {};
-I.lp = el => { lp[el.dataset.k] = el.value; st.lp = Object.assign({}, lp); save(); clearTimeout(window._lpt); window._lpt = setTimeout(AFTER.landing, 250); };
-A.lpAI = async () => { if (busy) return; busy = true; refresh(); try { const r = await aiLanding(); lp = { headline: r.headline || lp.headline, sub: r.sub || lp.sub, cta: r.cta || lp.cta }; st.lp = Object.assign({ ai: true }, lp); save(); toast('Textes écrits par Nia avec Claude'); } catch (e) { toast(aiError(e)); } busy = false; refresh(); };
-function lpCode() {
-  const id = (ONLINE && user ? user.id : (st.localId || (st.localId = uid()))).replace(/[^a-z0-9]/gi, '').slice(0, 6).toUpperCase();
-  return 'AZ' + (plan === 'magasin' ? 'M' : 'B') + id;
-}
-function lpWaLink() {
-  let n = String(CFG.landingWhatsapp || '').replace(/\D/g, ''); if (/^0\d{9}$/.test(n)) n = '33' + n.slice(1); if (/^330\d{9}$/.test(n)) n = '33' + n.slice(3);
-  if (!n) return '';
-  const p = st.profile, f = PLAN_NAME[plan] || 'La Boutique';
-  const msg = `Bonjour SC Project ! Je suis client Anza, formule ${f}, et je souhaite ma landing page personnalisée offerte.\n\nActivité : ${p.business || 'à préciser'}${p.activity ? ', ' + p.activity : ''}${p.city ? ', ' + p.city : ''}\nEmail : ${(ONLINE && user && user.email) || p.email || 'à préciser'}\nCode Anza : ${lpCode()}`;
-  return `https://wa.me/${n}?text=${encodeURIComponent(msg)}`;
-}
-function lpOfferCard() {
-  const link = lpWaLink(); if (!link) return '';
-  return `<div class="card offer-lp" style="margin-top:16px"><div class="offer-in"><div><p class="kick">Offert dans votre formule</p><h3>Votre landing page sur mesure, créée par SC Project</h3><p class="mute">Envie d’aller plus loin que ce modèle ? L’équipe SC Project conçoit gratuitement votre page personnalisée, à votre image. Envoyez votre demande sur WhatsApp, le message est déjà prêt.</p>${st.lpAsked ? `<small class="mute">Demande envoyée le ${fdate(st.lpAsked)}, votre code : <b>${lpCode()}</b></small>` : ''}</div><a class="btn pri" href="${link}" target="_blank" rel="noopener" data-a="lpAsk" data-keep="1">${ic('wa')}Demander ma landing offerte</a></div></div>`;
-}
-A.lpAsk = () => { st.lpAsked = iso(Date.now()); save(); setTimeout(refresh, 400); };
-A.lpDl = () => download('index.html', landingHTML(lp), 'text/html');
-A.lpOpen = () => { const w = window.open('', '_blank'); if (w) { w.document.write(landingHTML(lp)); w.document.close(); } };
 
 VIEWS.ia = () => {
   if (!has(3)) return lockView(3, 'Votre IA personnelle est dans le Magasin', 'Une IA entraînée sur votre activité, vos réponses à Nia et les résultats de vos publications. Plus personnalisée chaque mois, avec une équipe humaine derrière.');
@@ -669,7 +573,7 @@ function actCards(act, i) {
   ${act.applied ? '<p class="act-ok">✓ Appliqué</p>' : `<button class="btn pri sm" data-a="chatApply" data-n="${i}">Appliquer</button>`}</div>`;
 }
 AFTER.parler = () => { const c = $('#nchat'); if (c) c.scrollTop = c.scrollHeight; };
-AFTER.charte = () => { if (aiOn() && !busy && !aiBiosOk() && !autoTried.bio) { autoTried.bio = true; A.bioAI(); } };
+AFTER.reglages = () => mfaRefresh();
 AFTER.ia = () => { if (aiOn() && has(3) && !busy && !(st.aiSuggest && st.aiSuggest.week === weekKey()) && !autoTried.sug) { autoTried.sug = true; A.suggestAI(); } };
 A.chatClear = () => { st.niaChat = []; save(); refresh(); };
 A.chatSugg = el => { $('#nc-in').value = el.dataset.t; A.chatSend(); };
@@ -737,15 +641,17 @@ VIEWS.reglages = () => {
   return `<div class="head"><div><p class="kick">Réglages</p><h1>Votre espace</h1><p>Ces informations remplissent vos devis, vos contenus et votre landing page. Tout est enregistré automatiquement.</p></div></div>
   <div class="grid g2"><div class="card"><h3>Votre activité</h3><div class="form" style="margin-top:14px"><div class="grid g2">${f('first', 'Prénom')}${f('name', 'Nom complet')}</div><div class="grid g2">${f('business', 'Nom de l’activité')}${f('activity', 'Métier')}</div><div class="grid g2">${f('city', 'Ville ou zone')}${f('instagram', 'Compte Instagram', '', 'sans le @')}</div><div class="grid g2">${f('phone', 'Téléphone')}${f('email', 'Email professionnel', 'email')}</div><div class="grid g2">${f('siret', 'SIRET')}${f('address', 'Adresse sur les devis')}</div></div></div>
   <div class="card"><h3>Votre positionnement</h3><div class="form" style="margin-top:14px">${ta('target', 'Clients idéaux')}${ta('problem', 'Problème que vous réglez')}${ta('value', 'Votre valeur ajoutée')}${ta('proof', 'Vos preuves')}${ta('story', 'Votre histoire')}</div></div></div>
+  <div class="grid g2" style="margin-top:16px"><div class="card"><h3>Vos réseaux et liens</h3><div class="form" style="margin-top:14px"><div class="grid g2">${f('tiktok', 'Compte TikTok', '', 'sans le @')}${f('facebook', 'Page Facebook', 'url', 'https://facebook.com/…')}</div><div class="grid g2">${f('linkedin', 'Profil LinkedIn', 'url', 'https://linkedin.com/in/…')}${f('website', 'Site internet', 'url', 'https://')}</div>${f('calendly', 'Lien de réservation', 'url', 'Calendly, Planity, Cal.com…')}</div></div>
+  <div class="card"><h3>Paiements et avis</h3><div class="form" style="margin-top:14px">${f('payLink', 'Lien de paiement', 'url', 'Stripe, SumUp, PayPal, Lydia…')}<small class="mute">Créez un lien de paiement chez votre banque ou Stripe, SumUp, PayPal : il est ajouté à vos devis pour encaisser l’acompte.</small>${f('depositPct', 'Acompte habituel en %', 'number')}${f('googleReview', 'Lien pour laisser un avis Google', 'url', 'https://g.page/r/…/review')}<small class="mute">Dans votre fiche Google Business, touchez « Demander des avis » et copiez le lien.</small></div></div></div>
   <div class="card" style="margin-top:16px;padding:0"><div style="padding:18px 20px 6px"><h3>Prestations et prix <button class="btn sec sm" data-a="svcAdd">${ic('plus')}Ajouter</button></h3></div><div class="tablewrap"><table class="table"><thead><tr><th>Prestation</th><th>Prix en euros</th><th>Durée en minutes</th><th></th></tr></thead><tbody>${st.services.map((s, i) => `<tr><td><input value="${esc(s.name)}" data-i="set" data-path="services.${i}.name" class="cell" aria-label="Prestation"></td><td><input type="number" step="0.5" min="0" value="${s.price}" data-i="set" data-num data-path="services.${i}.price" class="cell sm" aria-label="Prix"></td><td><input type="number" min="0" value="${s.duration}" data-i="set" data-num data-path="services.${i}.duration" class="cell sm" aria-label="Durée"></td><td><button class="x" data-a="svcDel" data-n="${i}" aria-label="Supprimer">×</button></td></tr>`).join('') || '<tr><td colspan="4" class="empty">Ajoutez votre première prestation.</td></tr>'}</tbody></table></div></div>
   <div class="grid g3" style="margin-top:16px"><div class="card"><h3>Devis et déclarations</h3><div class="form" style="margin-top:14px"><label class="row" style="flex-wrap:nowrap;align-items:flex-start"><input type="checkbox" ${p.vatNote ? 'checked' : ''} data-c="set" data-path="profile.vatNote"> <span>Ajouter « TVA non applicable, article 293 B du CGI » sur les devis</span></label>
-    ${f('threshold', 'Seuil de chiffre d’affaires', 'number')}<div class="field"><label for="p-period">Déclaration</label><select id="p-period" data-c="set" data-path="profile.period">${['mensuelle', 'trimestrielle'].map(x => `<option ${p.period === x ? 'selected' : ''}>${x}</option>`).join('')}</select></div><small class="mute">Vérifiez le seuil en vigueur pour votre activité sur le site de l’URSSAF.</small></div></div>
+    ${f('threshold', 'Plafond de chiffre d’affaires', 'number')}<div class="field"><label for="p-period">Déclaration</label><select id="p-period" data-c="set" data-path="profile.period">${['mensuelle', 'trimestrielle'].map(x => `<option ${p.period === x ? 'selected' : ''}>${x}</option>`).join('')}</select></div><small class="mute">Plafond 2026 : 83 600 € pour les services, 203 100 € pour la vente. Taux de cotisations et seuil de TVA dans <a href="#/net">Net en poche</a>.</small></div></div>
   <div class="card"><h3>Installer l’application</h3><p class="mute" style="font-size:14px;margin-top:10px"><b>iPhone</b> : dans Safari, touchez Partager puis « Sur l’écran d’accueil ».<br><b>Android</b> : dans Chrome, menu ⋮ puis « Installer l’application ».<br><b>Ordinateur</b> : icône d’installation dans la barre d’adresse.</p><label class="row" style="margin-top:12px"><input type="checkbox" ${st.installed ? 'checked' : ''} data-c="set" data-path="installed"> C’est fait</label></div>
   <div class="card"><h3>Votre compte</h3><p class="mute" style="font-size:14px;margin-top:10px">${ONLINE && user ? `Connecté avec <b>${esc(user.email)}</b>.<br>` : 'Données enregistrées sur cet appareil.<br>'}Formule : <b>${PLAN_NAME[plan] || 'Le Stand'}</b></p>
     <div class="btns" style="margin-top:14px"><button class="btn sec sm" data-a="exportData">${ic('dl')}Exporter mes données</button><label class="btn sec sm" style="cursor:pointer">Importer<input type="file" accept="application/json" data-c="importData" hidden></label></div>
     <div class="btns" style="margin-top:8px"><button class="btn sec sm" data-a="logout">Se déconnecter</button><button class="btn danger sm" data-a="delAccount">Supprimer mon compte</button></div>
     <p class="mute" style="font-size:12px;margin-top:12px"><a href="${CFG.privacyUrl}" target="_blank" rel="noopener">Confidentialité</a> · <a href="${CFG.termsUrl}" target="_blank" rel="noopener">Conditions</a> · <a href="${CFG.legalUrl}" target="_blank" rel="noopener">Mentions légales</a> · <a href="mailto:${CFG.contactEmail}">${CFG.contactEmail}</a></p></div></div>
-  ${aiSettings()}${histCard()}`;
+  ${aiSettings()}${mfaCard()}${histCard()}`;
 };
 function aiSettings() {
   const mode = aiMode(), own = !!localKey(), canKey = ownKeyAllowed() && (!ONLINE || has(3));
@@ -790,6 +696,31 @@ A.keySave = A.keyConnect;
 A.aiLater = () => { st.aiLater = true; save(); refresh(); };
 A.keyDel = () => { try { localStorage.removeItem(keyStore()); } catch (e) {} toast('Clé retirée'); refresh(); };
 A.keyTest = async el => { const lbl = el.textContent; el.disabled = true; el.textContent = 'Test en cours'; try { const r = await aiWeeklyQuestion(); toast('Connexion réussie. Nia demande : ' + r.question); } catch (e) { toast(aiError(e)); } el.disabled = false; el.textContent = lbl; };
+function mfaCard() {
+  if (!ONLINE || !user) return '';
+  return `<div class="card" style="margin-top:16px"><h3>Double authentification <span id="mfa-tag"></span></h3><p class="mute" style="font-size:14px;margin-top:8px">En plus du mot de passe, un code à 6 chiffres généré par une application sur votre téléphone (Google Authenticator, Microsoft Authenticator, 1Password…). Même si votre mot de passe fuite, personne ne peut entrer sans votre téléphone.</p><div id="mfa-box" style="margin-top:12px"><small class="mute">Vérification…</small></div></div>`;
+}
+async function mfaRefresh() {
+  const box = $('#mfa-box'); if (!box) return;
+  try {
+    const f = await mfaStatus();
+    $('#mfa-tag').innerHTML = f ? '<span class="tag ok">Activée</span>' : '';
+    box.innerHTML = f ? '<button class="btn danger sm" data-a="mfaOff" data-id="' + esc(f.id) + '">Désactiver</button>' : '<button class="btn pri sm" data-a="mfaOn">Activer la double authentification</button>';
+  } catch (e) { box.innerHTML = '<small class="mute">Indisponible pour le moment.</small>'; }
+}
+A.mfaOn = async el => {
+  el.disabled = true;
+  try {
+    const d = await mfaEnroll(); window._mfa = d.id;
+    modal('Activer la double authentification', `<div class="form"><p class="mute" style="font-size:14px">1. Ouvrez votre application d’authentification et scannez ce code.</p><div style="display:grid;place-items:center;padding:8px"><img src="${esc(d.totp.qr_code)}" alt="QR code à scanner" width="200" height="200" style="background:#fff;border-radius:12px;padding:8px"></div><p class="mute" style="font-size:13px">Pas de scan possible ? Entrez cette clé à la main : <code style="word-break:break-all">${esc(d.totp.secret)}</code></p>${d.totp.uri ? `<a class="btn sec sm" href="${esc(d.totp.uri)}" data-keep="1" style="justify-self:start">Sur ce téléphone : ouvrir dans mon application</a>` : ''}<p class="mute" style="font-size:14px">2. Entrez le code à 6 chiffres affiché.</p><div class="field"><input id="mfa-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456" aria-label="Code à 6 chiffres"></div><div class="btns" style="justify-content:flex-end"><button class="btn sec" data-a="close">Annuler</button><button class="btn pri" data-a="mfaConfirm">Activer</button></div></div>`);
+  } catch (e) { toast('Activation impossible pour le moment'); }
+  el.disabled = false;
+};
+A.mfaConfirm = async () => {
+  const code = val('mfa-code').replace(/\D/g, ''); if (code.length !== 6) { toast('Le code contient 6 chiffres'); return; }
+  try { await mfaConfirm(window._mfa, code); closeModal(); toast('Double authentification activée'); mfaRefresh(); } catch (e) { toast('Code incorrect, réessayez avec le nouveau code'); }
+};
+A.mfaOff = el => confirmBox('Désactiver la double authentification ? Votre compte sera protégé uniquement par votre mot de passe.', 'Désactiver', async () => { try { await mfaRemove(el.dataset.id); toast('Double authentification désactivée'); } catch (e) { toast('Impossible pour le moment. Reconnectez vous puis réessayez.'); } mfaRefresh(); });
 function histCard() {
   return `<div class="card" style="margin-top:16px"><h3>Versions précédentes</h3><p class="mute" style="font-size:14px;margin-top:8px">Anza garde automatiquement les ${HIST_MAX} dernières versions de vos données, au plus une par heure d’activité. En cas d’erreur ou de suppression par mégarde, revenez à une version : l’état actuel est gardé lui aussi.</p><div id="hist" style="margin-top:12px"><button class="btn sec sm" data-a="histLoad">Voir les versions</button></div></div>`;
 }
@@ -817,10 +748,8 @@ C.importData = el => {
   r.onload = () => { try { const o = JSON.parse(r.result); if (!o || !o.profile || !Array.isArray(o.clients)) throw 0; confirmBox('Remplacer toutes vos données actuelles par celles de ce fichier ? Vos données actuelles restent dans les versions précédentes.', 'Remplacer', () => { if (!ONLINE) localSnap(st, true); st = migrate(o); st.onboarded = true; save(); toast('Données importées'); render(); }); } catch (e) { toast('Fichier non reconnu'); } };
   r.readAsText(f);
 };
-A.delAccount = () => confirmBox('Supprimer définitivement votre compte et toutes vos données ? Exportez les avant si vous voulez les garder. Cette action est irréversible.', 'Supprimer mon compte', () => deleteAccount());
+A.delAccount = () => confirmBox('Supprimer définitivement votre compte, vos photos, votre page et toutes vos données ? Exportez les avant si vous voulez les garder. Cette action est irréversible.', 'Supprimer mon compte', async () => { try { await removeAllMediaRemote(); } catch (e) {} await clearLocalMedia(); deleteAccount(); });
 
-window.addEventListener('hashchange', () => { if (!/^#\/devis\//.test(location.hash)) draft = null; if (st) render(); });
-boot();
 
 const TCOLS_DEFAULT = [{ id: 'todo', name: 'À faire' }, { id: 'doing', name: 'En cours' }, { id: 'wait', name: 'En attente' }, { id: 'done', name: 'Terminé', done: true }];
 function tcols() { if (!st.taskCols || !st.taskCols.length) st.taskCols = TCOLS_DEFAULT.map(x => Object.assign({}, x)); return st.taskCols; }

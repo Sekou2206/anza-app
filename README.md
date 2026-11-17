@@ -123,11 +123,39 @@ Le guide complet, étape par étape jusqu’à la livraison au client, est dans 
 - **Contenus préparés** (Magasin) : table `team_items` (`user_id`, `day`, `title`, `status` : `en_preparation`, `programme` ou `publie`).
 - **Être prévenu d’un nouveau message** : Database > Webhooks sur la table `messages`, vers un scénario n8n qui vous envoie un email.
 
+## Version 16 : studio photo, marque, ma page
+
+### Mise à jour à faire une seule fois
+1. Supabase > SQL Editor : collez tout `setup.sql` et lancez le (il est rejouable sans risque). Il crée les deux espaces de stockage (`media` privé pour les photos, `pages` public pour les pages en ligne), la table `pages` et la table `page_leads`, avec leurs règles de sécurité.
+2. Poussez le dossier sur GitHub comme d’habitude. Le dossier `p/` contient la page publique : `https://app.anza.website/p/?adresse-du-client`.
+3. Rien d’autre : aucune clé secrète n’est ajoutée, seule la clé publishable est utilisée.
+
+### Ce qui est nouveau
+- **Photothèque** : import de photos et du logo, compression automatique, stockage privé par client, synchronisé entre appareils. 40 photos au Stand, 150 à la Boutique, 500 au Magasin.
+- **Stories, carrousels et posts** : photos intégrées dans les images (plein cadre, encadrée, en haut), cadrage, logo en filigrane, six polices, quatre fonds, brouillons gardés, types Occasion (fêtes du calendrier français) et Objection (tirées du client idéal), Instagram, LinkedIn, Facebook, TikTok, format portrait ou carré.
+- **Publier** : vérification automatique (tirets, emojis, tu ou vous, bouton, hashtags, photos floues) avec correction en un clic, puis partage. Sur téléphone, l’application choisie s’ouvre avec les images. Sur ordinateur, ZIP téléchargé, légende copiée, plateforme ouverte. La publication automatique par les API Meta et LinkedIn demandera une app validée par ces plateformes.
+- **Hashtags** : 5 au maximum pour Instagram (règle Instagram depuis décembre 2025), 3 pour LinkedIn, locaux et renouvelés chaque semaine.
+- **Client idéal** : questionnaire, profils, hésitations et réponses, où les trouver, client à éviter, fiche PDF. Enrichi par Nia au Magasin. Tous les contenus s’en servent.
+- **Charte** : logo, couleurs extraites du logo ou des photos, palettes prêtes, polices, import et export, charte PDF.
+- **Bios** : Instagram, TikTok, Facebook, WhatsApp Business, LinkedIn, fiche Google, avec score.
+- **Ma page** : lien en bio hébergé (Stand), page complète avec galerie, avis, FAQ et demande de rendez vous (Boutique). Les demandes arrivent toutes seules dans les clients.
+- **Kit de marque** (Boutique) : voix de marque, pitchs, couvertures de highlights, bannières, carte de visite et flyer avec QR code, story avis, kit presse PDF.
+- **Vendre** : acompte sur les devis avec lien de paiement, rappel de rendez vous la veille, lien d’avis Google, ajout d’un contact depuis un message collé, conditions générales de vente (Boutique).
+- **Net en poche** : cotisations URSSAF 2026 (12,3 %, 21,2 %, 25,6 %, 23,2 %), versement libératoire, plafonds 2026 (83 600 € et 203 100 €), seuil de TVA réglable.
+
+### Sécurité
+- Photos privées : chaque client ne lit et n’écrit que son dossier, double authentification respectée.
+- Page publique : seules les colonnes utiles sont lisibles, rien d’autre du compte n’est exposé.
+- Formulaire public : contrôlé côté base (page publiée, longueurs, dates), 20 demandes par heure et par page au maximum, champ piège contre les robots.
+- Suppression du compte : photos et page supprimées avec les données.
+
 ## 7. À savoir
 
 **Sécurité**
 - Mot de passe effacé de la page dès la connexion, 10 caractères minimum avec lettres et chiffres.
 - Politique de sécurité du contenu (CSP) : aucun script ni appel vers un domaine non autorisé, affichage bloqué dans un site tiers.
+- Double authentification (TOTP) au choix de chaque client dans ses Réglages, imposée ensuite par la base (politiques restrictives) et par la fonction Nia.
+- Captcha Cloudflare Turnstile : mettez la Site Key dans `turnstileSiteKey` de `config.js`, publiez, puis activez le captcha dans Supabase avec la Secret Key.
 - Clé Claude personnelle effacée à la déconnexion. Données importées vérifiées avant chargement.
 - Dans Supabase : longueur minimale 10 avec lettres et chiffres, Secure email change et Secure password change, protection contre les mots de passe piratés et délai d’inactivité (plan Pro), Security Advisor une fois par mois. Double authentification sur Supabase, GitHub, IONOS et platform.claude.com.
 

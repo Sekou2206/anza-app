@@ -5,11 +5,13 @@ window.ANZA_CONFIG = {
   aiServer: false,
   allowOwnKey: true,
   defaultPlan: 'stand',
+  turnstileSiteKey: '',
   landingWhatsapp: '+33743631826',
   calendly: 'https://calendly.com/contact-anza/30min',
   contactEmail: 'contact@anza.website',
   privacyUrl: 'https://anza.website/confidentialite.html',
   legalUrl: 'https://anza.website/mentions-legales.html',
   termsUrl: 'https://anza.website/conditions.html',
-  plansUrl: 'https://anza.website/#formules'
+  plansUrl: 'https://anza.website/#formules',
+  pageBase: 'https://app.anza.website/p/'
 };

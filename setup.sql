@@ -117,6 +117,7 @@ create or replace function public.delete_my_account()
 returns void language plpgsql security definer set search_path = public, auth as $$
 begin
   if auth.uid() is null then raise exception 'not authenticated'; end if;
+  if not public.mfa_ok_for(auth.uid(), auth.jwt() ->> 'aal') then raise exception 'mfa required'; end if;
   delete from auth.users where id = auth.uid();
 end $$;
 
@@ -193,6 +194,7 @@ returns timestamptz language plpgsql security definer set search_path = public a
 declare v jsonb; cur jsonb; t timestamptz := now();
 begin
   if auth.uid() is null then raise exception 'not authenticated'; end if;
+  if not public.mfa_ok_for(auth.uid(), auth.jwt() ->> 'aal') then raise exception 'mfa required'; end if;
   select data into v from public.anza_history where id = version_id and user_id = auth.uid();
   if v is null then raise exception 'version not found'; end if;
   select data into cur from public.anza_state where user_id = auth.uid();
@@ -211,3 +213,132 @@ grant select on public.team_items to authenticated;
 grant select on public.anza_history to authenticated;
 grant select on public.anza_state to service_role;
 grant select, insert on public.ai_usage to service_role;
+
+create or replace function public.mfa_ok_for(uid uuid, aal text)
+returns boolean language sql stable security definer set search_path = public, auth as $$
+  select coalesce(aal, '') = 'aal2'
+      or not exists (select 1 from auth.mfa_factors f where f.user_id = uid and f.status = 'verified');
+$$;
+revoke all on function public.mfa_ok_for(uuid, text) from public, anon, authenticated;
+grant execute on function public.mfa_ok_for(uuid, text) to service_role;
+
+create or replace function public.mfa_ok()
+returns boolean language sql stable security definer set search_path = public, auth as $$
+  select public.mfa_ok_for(auth.uid(), auth.jwt() ->> 'aal');
+$$;
+revoke all on function public.mfa_ok() from public, anon;
+grant execute on function public.mfa_ok() to authenticated;
+
+drop policy if exists "mfa state" on public.anza_state;
+create policy "mfa state" on public.anza_state as restrictive for all to authenticated using (public.mfa_ok()) with check (public.mfa_ok());
+drop policy if exists "mfa messages" on public.messages;
+create policy "mfa messages" on public.messages as restrictive for all to authenticated using (public.mfa_ok()) with check (public.mfa_ok());
+drop policy if exists "mfa team" on public.team_items;
+create policy "mfa team" on public.team_items as restrictive for all to authenticated using (public.mfa_ok());
+drop policy if exists "mfa history" on public.anza_history;
+create policy "mfa history" on public.anza_history as restrictive for all to authenticated using (public.mfa_ok());
+
+create or replace function public.has_plan()
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.anza_state s where s.user_id = auth.uid() and s.plan in ('stand', 'boutique', 'magasin'));
+$$;
+revoke all on function public.has_plan() from public, anon;
+grant execute on function public.has_plan() to authenticated;
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('media', 'media', false, 5242880, array['image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do update set public = false, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('pages', 'pages', true, 5242880, array['image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do update set public = true, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "anza media read" on storage.objects;
+drop policy if exists "anza media insert" on storage.objects;
+drop policy if exists "anza media update" on storage.objects;
+drop policy if exists "anza media delete" on storage.objects;
+create policy "anza media read" on storage.objects for select to authenticated
+  using (bucket_id in ('media', 'pages') and (storage.foldername(name))[1] = auth.uid()::text and public.mfa_ok());
+create policy "anza media insert" on storage.objects for insert to authenticated
+  with check (bucket_id in ('media', 'pages') and (storage.foldername(name))[1] = auth.uid()::text and public.mfa_ok() and public.has_plan());
+create policy "anza media update" on storage.objects for update to authenticated
+  using (bucket_id in ('media', 'pages') and (storage.foldername(name))[1] = auth.uid()::text and public.mfa_ok())
+  with check (bucket_id in ('media', 'pages') and (storage.foldername(name))[1] = auth.uid()::text and public.mfa_ok() and public.has_plan());
+create policy "anza media delete" on storage.objects for delete to authenticated
+  using (bucket_id in ('media', 'pages') and (storage.foldername(name))[1] = auth.uid()::text and public.mfa_ok());
+
+create table if not exists public.pages (
+  slug text primary key check (slug ~ '^[a-z0-9]([a-z0-9-]{1,38}[a-z0-9])$'),
+  user_id uuid not null unique references auth.users(id) on delete cascade,
+  published boolean not null default false,
+  data jsonb not null default '{}'::jsonb check (pg_column_size(data) < 200000),
+  updated_at timestamptz not null default now()
+);
+alter table public.pages enable row level security;
+drop policy if exists "pages public read" on public.pages;
+drop policy if exists "pages own read" on public.pages;
+drop policy if exists "pages own insert" on public.pages;
+drop policy if exists "pages own update" on public.pages;
+drop policy if exists "pages own delete" on public.pages;
+drop policy if exists "mfa pages" on public.pages;
+create policy "pages public read" on public.pages for select to anon using (published = true);
+create policy "pages own read" on public.pages for select to authenticated using (user_id = auth.uid() or published = true);
+create policy "pages own insert" on public.pages for insert to authenticated with check (user_id = auth.uid() and public.has_plan());
+create policy "pages own update" on public.pages for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid() and public.has_plan());
+create policy "pages own delete" on public.pages for delete to authenticated using (user_id = auth.uid());
+create policy "mfa pages" on public.pages as restrictive for all to authenticated using (published = true or public.mfa_ok()) with check (public.mfa_ok());
+revoke all on public.pages from anon, authenticated;
+grant select (slug, published, data, updated_at) on public.pages to anon;
+grant select, insert, update, delete on public.pages to authenticated;
+
+create table if not exists public.page_leads (
+  id bigint generated always as identity primary key,
+  page_slug text not null references public.pages(slug) on update cascade on delete cascade,
+  owner uuid not null references auth.users(id) on delete cascade,
+  kind text not null default 'contact' check (kind in ('contact', 'booking')),
+  name text not null check (char_length(name) between 1 and 80),
+  contact text not null check (char_length(contact) between 3 and 120),
+  message text check (message is null or char_length(message) <= 1000),
+  wish_date date,
+  wish_time text check (wish_time is null or wish_time ~ '^[0-2][0-9]:[0-5][0-9]$'),
+  imported boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create index if not exists page_leads_owner_idx on public.page_leads(owner, imported, created_at);
+create index if not exists page_leads_slug_idx on public.page_leads(page_slug, created_at);
+
+create or replace function public.page_leads_guard()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare o uuid;
+begin
+  select p.user_id into o from public.pages p where p.slug = new.page_slug and p.published = true;
+  if o is null then raise exception 'page not found'; end if;
+  if (select count(*) from public.page_leads l where l.page_slug = new.page_slug and l.created_at > now() - interval '1 hour') >= 20 then raise exception 'rate limit'; end if;
+  if new.wish_date is not null and (new.wish_date < current_date or new.wish_date > current_date + 200) then raise exception 'bad date'; end if;
+  new.owner := o; new.imported := false; new.created_at := now();
+  new.name := left(trim(new.name), 80); new.contact := left(trim(new.contact), 120);
+  return new;
+end $$;
+revoke all on function public.page_leads_guard() from public, anon, authenticated;
+drop trigger if exists page_leads_guard on public.page_leads;
+create trigger page_leads_guard before insert on public.page_leads for each row execute function public.page_leads_guard();
+
+alter table public.page_leads enable row level security;
+drop policy if exists "leads public insert" on public.page_leads;
+drop policy if exists "leads own read" on public.page_leads;
+drop policy if exists "leads own update" on public.page_leads;
+drop policy if exists "leads own delete" on public.page_leads;
+drop policy if exists "mfa leads read" on public.page_leads;
+drop policy if exists "mfa leads update" on public.page_leads;
+drop policy if exists "mfa leads delete" on public.page_leads;
+create policy "leads public insert" on public.page_leads for insert to anon, authenticated with check (imported = false);
+create policy "leads own read" on public.page_leads for select to authenticated using (owner = auth.uid());
+create policy "leads own update" on public.page_leads for update to authenticated using (owner = auth.uid()) with check (owner = auth.uid());
+create policy "leads own delete" on public.page_leads for delete to authenticated using (owner = auth.uid());
+create policy "mfa leads read" on public.page_leads as restrictive for select to authenticated using (public.mfa_ok());
+create policy "mfa leads update" on public.page_leads as restrictive for update to authenticated using (public.mfa_ok());
+create policy "mfa leads delete" on public.page_leads as restrictive for delete to authenticated using (public.mfa_ok());
+revoke all on public.page_leads from anon, authenticated;
+grant insert (page_slug, kind, name, contact, message, wish_date, wish_time) on public.page_leads to anon, authenticated;
+grant select on public.page_leads to authenticated;
+grant update (imported) on public.page_leads to authenticated;
+grant delete on public.page_leads to authenticated;

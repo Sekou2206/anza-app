@@ -27,8 +27,8 @@ const WEEKLY_Q = [
   'Qu’est ce qui vous donne de l’énergie en ce moment ?'
 ];
 
-const STORY_TYPES = ['Avant après', 'Preuve', 'Coulisses', 'Offre', 'Conseil'];
-const ANGLES = ['Erreurs', 'Conseils', 'Histoire', 'Preuve', 'Offre'];
+const STORY_TYPES = ['Offre', 'Avant après', 'Preuve', 'Coulisses', 'Conseil', 'Occasion', 'Objection'];
+const ANGLES = ['Erreurs', 'Conseils', 'Histoire', 'Preuve', 'Offre', 'Coulisses', 'Objection', 'Occasion'];
 
 function V(vous, tu) { return st.profile.tone === 'tu' ? tu : vous; }
 function emo(e) { return st.brand.emoji && st.ai.warmth >= 50 ? ' ' + e : ''; }
@@ -56,7 +56,7 @@ function P() {
   return {
     business: p.business || 'Mon activité', activity: p.activity || 'Indépendant', city: p.city || 'près de chez vous',
     story: p.story || 'Je me suis lancé pour faire les choses autrement.',
-    target: p.target || 'Les personnes qui veulent un travail soigné',
+    target: (typeof primaryPersona === 'function' && primaryPersona() ? uc(personaShort()) : '') || p.target || 'Les personnes qui veulent un travail soigné',
     problem: p.problem || 'Vous cherchez quelqu’un de fiable, sans mauvaise surprise',
     value: p.value || 'Un travail soigné et un vrai suivi',
     proof: p.proof || 'Des clients qui reviennent et qui recommandent',
@@ -72,7 +72,8 @@ function followMessage(rule, cl) {
     prospect: V(`${hi} Je reviens vers vous suite à votre demande. Êtes vous toujours intéressé par ${lc(p.offer)} ? Je peux vous proposer un créneau cette semaine.${emo('😊')}`, `${hi} Je reviens vers toi suite à ta demande. Tu es toujours intéressé par ${lc(p.offer)} ? Je peux te proposer un créneau cette semaine.${emo('😊')}`),
     devis: V(`${hi} Avez vous pu regarder le devis que je vous ai envoyé ? Je reste disponible si vous avez la moindre question.`, `${hi} Tu as pu regarder le devis que je t’ai envoyé ? Je reste dispo si tu as la moindre question.`),
     revoir: V(`${hi} Cela fait un moment depuis notre dernier rendez vous. Souhaitez vous que l’on planifie la suite ensemble ?${emo('✨')}`, `${hi} Ça fait un moment depuis notre dernier rendez vous. Tu veux qu’on planifie la suite ensemble ?${emo('✨')}`),
-    avis: V(`${hi} Merci encore pour votre confiance. Si vous avez deux minutes, un avis Google m’aiderait énormément.${emo('🙏')}`, `${hi} Merci encore pour ta confiance. Si tu as deux minutes, un avis Google m’aiderait énormément.${emo('🙏')}`)
+    avis: V(`${hi} Merci encore pour votre confiance. Si vous avez deux minutes, un avis Google m’aiderait énormément.${emo('🙏')}`, `${hi} Merci encore pour ta confiance. Si tu as deux minutes, un avis Google m’aiderait énormément.${emo('🙏')}`) + (st.profile.googleReview ? `\n${st.profile.googleReview}` : ''),
+    rappel: V(`${hi} Petit rappel : je vous attends ${cl.next === iso(Date.now() + DAY) ? 'demain' : cl.next === iso(Date.now()) ? 'aujourd’hui' : 'le ' + fdateL(cl.next)}${cl.nextTime ? ' à ' + cl.nextTime.replace(':', 'h') : ''}. Si vous avez un empêchement, prévenez moi dès que possible. À très vite !`, `${hi} Petit rappel : je t’attends ${cl.next === iso(Date.now() + DAY) ? 'demain' : cl.next === iso(Date.now()) ? 'aujourd’hui' : 'le ' + fdateL(cl.next)}${cl.nextTime ? ' à ' + cl.nextTime.replace(':', 'h') : ''}. Si tu as un empêchement, préviens moi dès que possible. À très vite !`)
   }[rule];
   return st.ai.length > 70 ? `${m}\n\nÀ très vite,\n${st.profile.first || ''} ${p.business}`.trim() : m;
 }
@@ -116,6 +117,8 @@ function storyFrames(type, subject) {
       { t: 'Places limitées.', s: 'Premier message, premier servi.' },
       { t: 'Je réserve.', s: 'Message « INFO » ou lien en bio.', c: p.cta }
     ],
+    'Occasion': occasionFrames(s),
+    'Objection': objectionFrames(s),
     'Conseil': [
       { t: s || 'Bien choisir : 3 conseils avant de réserver.', s: V('Enregistrez cette story.', 'Enregistre cette story.') },
       { t: '1. Le prix ne dit pas tout.', s: 'Regardez ce qui est inclus, pas seulement le montant.' },
@@ -126,6 +129,35 @@ function storyFrames(type, subject) {
     ]
   };
   return (T[type] || T['Offre']).map(f => ({ t: f.t, s: f.s || '', c: f.c || '' }));
+}
+
+function occasionFrames(subject) {
+  const o = currentOccasion() || upcomingOccasions(60)[0], p = P(), sv = st.services[0];
+  if (!o) return null;
+  return [
+    { t: subject || `${o.name} ${inDays(o.days)}.`, s: V('Vous y avez pensé ?', 'Tu y as pensé ?') },
+    { t: occasionLine(o), s: '' },
+    { t: V('Mon idée pour vous.', 'Mon idée pour toi.'), s: sv ? `${sv.name}, ${sv.price} €.` : dot(p.offer) },
+    { t: `Places limitées avant le ${fdate(iso(o.date))}.`, s: 'À cette période, les créneaux partent vite.' },
+    { t: dot(p.proof), s: dot(p.value) },
+    { t: V('Je réserve.', 'Je réserve.'), s: 'Message « INFO » ou lien en bio.', c: p.cta }
+  ];
+}
+function pickObjection(subject) {
+  const per = primaryPersona(), list = per && per.objections.length ? per.objections : sec().objections.map(k => Object.assign({ key: k }, OBJ[k]()));
+  if (subject) { const f = list.find(o => slug(o.q).includes(slug(subject)) || slug(subject).includes(o.key)); if (f) return f; }
+  return list[(new Date().getDate()) % list.length];
+}
+function objectionFrames(subject) {
+  const o = pickObjection(subject), p = P();
+  return [
+    { t: `« ${o.q.replace(/\.$/, '')} »`, s: 'C’est ce qu’on me dit souvent.' },
+    { t: 'Je comprends.', s: o.e },
+    { t: 'La vérité.', s: o.a },
+    { t: 'Ce qui change tout.', s: dot(p.value) },
+    { t: dot(p.proof), s: V('Et vous, qu’est ce qui vous retient ?', 'Et toi, qu’est ce qui te retient ?') },
+    { t: 'On en parle ?', s: V('Écrivez moi, je réponds à tout.', 'Écris moi, je réponds à tout.'), c: p.cta }
+  ];
 }
 
 function postContent(net, format, angle, subject) {
@@ -167,23 +199,41 @@ function postContent(net, format, angle, subject) {
       { k: 'POUR QUI', t: dot(p.target), p: '' },
       { k: 'LA PROMESSE', t: dot(p.value), p: '' },
       { k: 'RÉSERVER', t: 'Message « INFO ».', p: 'Ou lien en bio.' }
-    ]
+    ],
+    Coulisses: [
+      { k: 'COULISSES', t: s || `Une journée chez ${p.business}.`, p: '' },
+      { k: 'LE MATIN', t: 'Tout commence par la préparation.', p: 'Ce que personne ne voit, mais qui change tout.' },
+      { k: 'LE DÉTAIL', t: 'Le soin du détail.', p: dot(p.value) },
+      { k: 'LE RÉSULTAT', t: 'Et voilà le résultat.', p: dot(p.proof) },
+      { k: 'ET VOUS ?', t: V('Vous voulez la même chose ?', 'Tu veux la même chose ?'), p: V('Écrivez moi « INFO ».', 'Écris moi « INFO ».') }
+    ],
+    Objection: (() => { const o = pickObjection(s); return [
+      { k: 'ON ME DIT SOUVENT', t: s || `« ${o.q.replace(/\.$/, '')} »`, p: '' },
+      { k: 'JE COMPRENDS', t: o.e, p: '' },
+      { k: 'LA VÉRITÉ', t: o.a, p: '' },
+      { k: 'CE QUI CHANGE TOUT', t: dot(p.value), p: dot(p.proof) },
+      { k: 'ON EN PARLE ?', t: V('Écrivez moi, je réponds à tout.', 'Écris moi, je réponds à tout.'), p: '' }
+    ]; })(),
+    Occasion: (() => { const o = currentOccasion() || upcomingOccasions(60)[0]; if (!o) return null; const sv = st.services[0]; return [
+      { k: o.name.toUpperCase(), t: s || `${o.name} ${inDays(o.days)}.`, p: '' },
+      { k: 'MON IDÉE', t: occasionLine(o), p: '' },
+      { k: 'LA PRESTATION', t: sv ? `${sv.name}.` : dot(p.offer), p: sv ? `${sv.price} €` : '' },
+      { k: 'ATTENTION', t: `Places limitées avant le ${fdate(iso(o.date))}.`, p: 'Les créneaux partent vite à cette période.' },
+      { k: 'RÉSERVER', t: 'Message « INFO ».', p: 'Ou lien en bio.' }
+    ]; })()
   };
   let slides = (S[angle] || S.Conseils).map(x => Object.assign({}, x));
   if (format === 'Post') slides = [slides[0]];
   const hook = slides[0].t;
-  const words = (p.activity + ' ' + p.city).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').split(/[^a-z0-9]+/).filter(w => w.length > 3).slice(0, 3);
-  const tag = s2 => '#' + s2.replace(/[^A-Za-z0-9]/g, '').toLowerCase();
-  const tags = net === 'Instagram' ? `\n\n${[tag(p.business), ...words.map(w => '#' + w), '#entrepreneur'].join(' ')}` : `\n\n#entrepreneuriat ${words.slice(0, 2).map(w => '#' + w).join(' ')}`;
   let caption;
   if (net === 'LinkedIn') {
-    caption = `${hook}\n\n${dot(p.story)}\n\nCe que je vois chez mes clients : ${lc(dot(p.problem))}\n\nCe que j’ai choisi de faire : ${lc(dot(p.value))}\n\nAujourd’hui : ${lc(dot(p.proof))}\n\nEt vous, qu’est ce qui a fait la différence dans votre parcours ?${tags}`;
+    caption = `${hook}\n\n${dot(p.story)}\n\nCe que je vois chez mes clients : ${lc(dot(p.problem))}\n\nCe que j’ai choisi de faire : ${lc(dot(p.value))}\n\nAujourd’hui : ${lc(dot(p.proof))}\n\nEt vous, qu’est ce qui a fait la différence dans votre parcours ?`;
   } else {
     const body = slides.slice(1, 4).map(x => `${/^\d\d$/.test(x.k) ? x.k + '. ' : ''}${x.t}`).join('\n');
-    caption = `${hook}${emo('✨')}\n\n${body}\n\n${V('Enregistrez ce post et partagez le.', 'Enregistre ce post et partage le.')}\n${uc(st.profile.cta || 'Réserver')} : message « INFO » ou lien en bio.${tags}`;
-    if (st.ai.length < 30) caption = `${hook}${emo('✨')}\n\n${uc(st.profile.cta || 'Réserver')} : lien en bio.${tags}`;
+    caption = `${hook}${emo('✨')}\n\n${body}\n\n${V('Enregistrez ce post et partagez le.', 'Enregistre ce post et partage le.')}\n${uc(st.profile.cta || 'Réserver')} : message « INFO » ou lien en bio.`;
+    if (st.ai.length < 30) caption = `${hook}${emo('✨')}\n\n${uc(st.profile.cta || 'Réserver')} : lien en bio.`;
   }
-  return { slides, caption };
+  return { slides, caption, tags: hashtags(net) };
 }
 
 function bios() {
@@ -207,7 +257,7 @@ function planMonth() {
   const start = mondayOf(Date.now()), today = iso(Date.now());
   const plan = { 1: ['Story', 'Conseil'], 2: ['Carrousel', null], 3: ['Story', 'Preuve'], 4: ['LinkedIn', 'Histoire'], 5: ['Story', 'Offre'] };
   const angles = ['Erreurs', 'Conseils', 'Preuve', 'Histoire'];
-  let added = 0, ci = 0;
+  let added = 0, ci = 0, occDone = false;
   for (let i = 0; i < 28; i++) {
     const d = new Date(start.getTime() + i * DAY), k = iso(d);
     if (k < today) continue;
@@ -216,10 +266,12 @@ function planMonth() {
     if (!want || st.calendar.some(e => e.date === k)) continue;
     let [type, angle] = want;
     if (type === 'Carrousel') angle = angles[ci++ % angles.length];
+    const oc = currentOccasion();
+    if (oc && type === 'Story' && !st.calendar.some(e => e.angle === 'Occasion' && e.date >= today) && !occDone) { const od = toDate(iso(oc.date)); if (d < od) { angle = 'Occasion'; occDone = true; } }
     const title = type === 'Bilan' ? 'Story bilan, ce mois chez nous'
       : type === 'LinkedIn' ? 'Post LinkedIn, ' + postContent('LinkedIn', 'Post', angle).slides[0].t
         : type === 'Carrousel' ? 'Carrousel, ' + postContent('Instagram', 'Carrousel', angle).slides[0].t
-          : 'Story ' + angle.toLowerCase() + ', ' + storyFrames(angle)[0].t;
+          : 'Story ' + angle.toLowerCase() + ', ' + (storyFrames(angle)[0] || {}).t;
     st.calendar.push({ id: uid(), date: k, type, angle, title, done: false });
     added++;
   }
@@ -245,25 +297,6 @@ function bestAngle() {
   return Object.entries(by).map(([a, o]) => ({ a, m: o.m / o.n, v: o.v / o.n })).sort((x, y) => y.m - x.m);
 }
 
-function landingHTML(o) {
-  const p = st.profile, q = P(), b = st.brand;
-  const phone = String(p.phone || '').replace(/\D/g, '').replace(/^0/, '33');
-  const items = st.services.map(s => `<li><span>${esc(s.name)}</span><b>${s.price} €</b></li>`).join('') || '<li><span>Tarifs sur demande</span></li>';
-  const href = phone ? `https://wa.me/${phone}?text=${encodeURIComponent('Bonjour, je souhaite prendre rendez vous.')}` : (p.email ? `mailto:${esc(p.email)}` : '#');
-  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(q.business)}</title><meta name="description" content="${esc(dot(q.value))}"><style>
-*{box-sizing:border-box;margin:0;padding:0}body{font-family:${b.font === 'Serif' ? 'Georgia,serif' : 'system-ui,-apple-system,Segoe UI,Roboto,sans-serif'};color:${b.ink};background:#fff;line-height:1.5}
-.h{background:${b.primary};color:#fff;padding:56px 24px 64px;text-align:center}.h small{font-size:12px;letter-spacing:.14em;text-transform:uppercase;opacity:.75}
-.h h1{font-size:clamp(32px,7vw,54px);line-height:1.04;letter-spacing:-.03em;margin:14px auto 0;max-width:16ch}.h p{margin:16px auto 0;max-width:42ch;opacity:.9}
-.b{display:inline-block;margin-top:26px;background:#fff;color:${b.ink};text-decoration:none;font-weight:700;padding:15px 28px;border-radius:30px}
-.s{max-width:640px;margin:0 auto;padding:44px 24px}.s h2{font-size:24px;letter-spacing:-.02em;margin-bottom:14px}
-ul{list-style:none}li{display:flex;justify-content:space-between;gap:16px;padding:14px 0;border-bottom:1px solid #E3E8F2}
-.p{background:${b.soft};border-radius:18px;padding:22px;margin-top:8px;font-size:17px}
-footer{text-align:center;padding:30px 24px;font-size:13px;color:#5A6680}
-</style></head><body><header class="h"><small>${esc(uc(q.activity))}, ${esc(q.city)}</small><h1>${esc(o.headline)}</h1><p>${esc(o.sub)}</p><a class="b" href="${href}">${esc(o.cta)}</a></header>
-<section class="s"><h2>Prestations</h2><ul>${items}</ul></section><section class="s" style="padding-top:0"><h2>Ce qu’en disent les clients</h2><p class="p">${esc(dot(q.proof))}</p></section>
-<footer>${esc(q.business)}${p.city ? ' · ' + esc(p.city) : ''}${p.instagram ? ' · @' + esc(p.instagram) : ''}${p.siret ? ' · SIRET ' + esc(p.siret) : ''}</footer></body></html>`;
-}
-
 function wrapLines(ctx, text, maxW) {
   const out = [];
   String(text).split('\n').forEach(par => {
@@ -273,46 +306,6 @@ function wrapLines(ctx, text, maxW) {
   });
   return out;
 }
-function palette(style) {
-  const b = st.brand;
-  if (style === 'Nuit') return { bg: '#0A1020', fg: '#F6F8FC', cb: b.accent, cf: '#FFFFFF' };
-  if (style === 'Clair') return { bg: '#F6F8FC', fg: b.ink, cb: b.primary, cf: '#FFFFFF' };
-  return { bg: b.accent, fg: '#FFFFFF', cb: '#FFFFFF', cf: b.ink };
-}
-function fontFam() { return st.brand.font === 'Serif' ? 'Georgia, serif' : 'Inter, sans-serif'; }
-function drawStory(frame, i, total, style) {
-  const W = 1080, H = 1920, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
-  const x = cv.getContext('2d'), c = palette(style), font = fontFam();
-  x.fillStyle = c.bg; x.fillRect(0, 0, W, H);
-  const gap = 10, bw = (W - 120 - gap * (total - 1)) / total;
-  for (let k = 0; k < total; k++) { x.globalAlpha = k <= i ? 1 : .35; x.fillStyle = c.fg; x.fillRect(60 + k * (bw + gap), 70, bw, 8); }
-  x.globalAlpha = 1; x.beginPath(); x.arc(92, 150, 30, 0, Math.PI * 2); x.fill();
-  x.font = `600 34px ${font}`; x.fillText(P().handle, 140, 162);
-  let y = H - 220 - (frame.c ? 140 : 0);
-  x.font = `500 46px ${font}`; const sub = frame.s ? wrapLines(x, frame.s, W - 160) : [];
-  x.font = `800 104px ${font}`; const tl = wrapLines(x, frame.t, W - 160);
-  y -= sub.length * 62 + (sub.length ? 40 : 0) + tl.length * 108;
-  tl.forEach(l => { y += 108; x.fillText(l, 80, y); });
-  x.font = `500 46px ${font}`; x.globalAlpha = .9; y += 30; sub.forEach(l => { y += 62; x.fillText(l, 80, y); });
-  x.globalAlpha = 1;
-  if (frame.c) { const by = H - 280; x.fillStyle = c.cb; roundRect(x, 80, by, W - 160, 120, 60); x.fill(); x.fillStyle = c.cf; x.font = `700 44px ${font}`; x.textAlign = 'center'; x.fillText(frame.c, W / 2, by + 76); x.textAlign = 'left'; }
-  return cv.toDataURL('image/png');
-}
-function drawSlide(sl, i, total, style) {
-  const W = 1080, H = 1350, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
-  const x = cv.getContext('2d'), c = palette(i === 0 ? style : (i % 2 ? 'Clair' : style)), font = fontFam();
-  x.fillStyle = c.bg; x.fillRect(0, 0, W, H); x.fillStyle = c.fg;
-  x.font = `700 34px ${font}`; x.globalAlpha = .7; x.fillText(sl.k, 90, 140); x.globalAlpha = 1;
-  x.font = `800 92px ${font}`; const tl = wrapLines(x, sl.t, W - 180);
-  x.font = `500 42px ${font}`; const pl = sl.p ? wrapLines(x, sl.p, W - 180) : [];
-  let y = H - 160 - pl.length * 58 - (pl.length ? 30 : 0) - tl.length * 98;
-  x.font = `800 92px ${font}`; tl.forEach(l => { y += 98; x.fillText(l, 90, y); });
-  x.font = `500 42px ${font}`; y += 30; x.globalAlpha = .9; pl.forEach(l => { y += 58; x.fillText(l, 90, y); });
-  x.globalAlpha = .6; x.font = `600 30px ${font}`; x.textAlign = 'right'; x.fillText(`${i + 1} / ${total}`, W - 90, 140); x.textAlign = 'left';
-  return cv.toDataURL('image/png');
-}
-function roundRect(x, a, b, w, h, r) { x.beginPath(); x.moveTo(a + r, b); x.arcTo(a + w, b, a + w, b + h, r); x.arcTo(a + w, b + h, a, b + h, r); x.arcTo(a, b + h, a, b, r); x.arcTo(a, b, a + w, b, r); x.closePath(); }
-
 function deepTidy(o) {
   if (typeof o === 'string') return tidy(o);
   if (Array.isArray(o)) return o.map(deepTidy);

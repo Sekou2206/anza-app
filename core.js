@@ -20,6 +20,10 @@ function plural(n, a, b) { return n + ' ' + (n > 1 ? b : a); }
 const PLAN = { attente: 0, stand: 1, boutique: 2, magasin: 3 };
 const PLAN_NAME = { stand: 'Le Stand', boutique: 'La Boutique', magasin: 'Le Magasin' };
 function has(level) { return (plan in PLAN ? PLAN[plan] : 1) >= level; }
+function planLevel() { return Math.max(1, plan in PLAN ? PLAN[plan] : 1); }
+const PHOTO_LIMIT = { 1: 40, 2: 150, 3: 500 };
+function photoLimit() { return PHOTO_LIMIT[planLevel()] || 40; }
+function lockTag(level) { return `<span class="lock">${level === 2 ? 'BOUTIQUE' : 'MAGASIN'}</span>`; }
 
 const ICON = {
   board: '<rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="10" rx="1.5"/><rect x="17" y="4" width="4" height="13" rx="1.5"/>',
@@ -49,15 +53,29 @@ const ICON = {
   check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
   menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
   msg: '<path d="M21 12a8 8 0 01-11.6 7.1L4 20l1-4.6A8 8 0 1121 12z"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/>',
-  send: '<path d="M4 12l16-8-6 16-3-7z"/>'
+  send: '<path d="M4 12l16-8-6 16-3-7z"/>',
+  image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5.5-5.5L6 20"/>',
+  target: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/>',
+  at: '<circle cx="12" cy="12" r="3.5"/><path d="M15.5 12v1.5a2.5 2.5 0 005 0V12a8.5 8.5 0 10-3.4 6.8"/>',
+  kit: '<path d="M4 8h16v12H4z"/><path d="M9 8V5h6v3M4 13h16"/>',
+  coin: '<circle cx="12" cy="12" r="8.5"/><path d="M14.8 9.2a3.5 3.5 0 100 5.6M8 11h5M8 13.2h5"/>',
+  shield: '<path d="M12 3l7.5 3v5.5c0 4.5-3.2 8.1-7.5 9.5-4.3-1.4-7.5-5-7.5-9.5V6z"/><path d="M9 12l2 2 4-4"/>',
+  share: '<circle cx="18" cy="5.5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="18.5" r="2.5"/><path d="M8.2 10.8l7.6-4M8.2 13.2l7.6 4"/>',
+  up: '<path d="M12 20V9M7 14l5-5 5 5M5 4h14"/>',
+  trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+  edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/>',
+  eye: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
+  star: '<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>',
+  link: '<path d="M10 14a4.5 4.5 0 006.4 0l3-3a4.5 4.5 0 00-6.4-6.4l-1 1"/><path d="M14 10a4.5 4.5 0 00-6.4 0l-3 3a4.5 4.5 0 006.4 6.4l1-1"/>'
 };
 const ic = n => `<svg viewBox="0 0 24 24">${ICON[n]}</svg>`;
 
 const NAV = [
-  ['Piloter', [['accueil', 'Accueil', 'home']]],
-  ['Vendre', [['crm', 'Clients', 'users'], ['tableau', 'Tableau', 'board', 'task'], ['relances', 'Relances', 'bell', 'rel'], ['devis', 'Devis', 'file']]],
+  ['Piloter', [['accueil', 'Accueil', 'home'], ['net', 'Net en poche', 'coin']]],
+  ['Vendre', [['crm', 'Clients', 'users'], ['tableau', 'Tableau', 'board', 'task'], ['relances', 'Relances', 'bell', 'rel'], ['devis', 'Devis', 'file'], ['cgv', 'Conditions de vente', 'shield', null, 2]]],
   ['Nia, brand manager', [['parler', 'Parler à Nia', 'msg', null, 3], ['nia', 'Entretien de départ', 'chat'], ['semaine', 'Question de la semaine', 'spark', 'week'], ['journal', 'Journal', 'book']]],
-  ['Attirer', [['stories', 'Séquenceur de stories', 'story'], ['posts', 'Carrousels et posts', 'grid'], ['calendrier', 'Calendrier', 'cal'], ['bilan', 'Bilan du mois', 'chart'], ['charte', 'Charte et bio', 'palette'], ['landing', 'Landing page', 'page', null, 2]]],
+  ['Attirer', [['stories', 'Stories', 'story'], ['posts', 'Carrousels et posts', 'grid'], ['photos', 'Photothèque', 'image'], ['calendrier', 'Calendrier', 'cal'], ['bilan', 'Bilan du mois', 'chart']]],
+  ['Marque', [['icp', 'Client idéal', 'target'], ['charte', 'Charte', 'palette'], ['bio', 'Bios', 'at'], ['landing', 'Ma page', 'page', 'lead'], ['kit', 'Kit de marque', 'kit', null, 2]]],
   ['Magasin', [['ia', 'Mon IA personnelle', 'brain', null, 3], ['equipe', 'Accompagnement', 'team', null, 3]]],
   ['', [['reglages', 'Réglages', 'gear']]]
 ];
@@ -79,7 +97,7 @@ function layout() {
   const rel = computeFollow().length;
   const navHTML = NAV.map(([g, items]) => `<div class="navg">${g ? `<p>${g}</p>` : ''}${items.map(([k, label, icon, badge, lvl]) => {
     const locked = lvl && !has(lvl);
-    const late = badge === 'task' ? tasksLate() : 0;
+    const late = badge === 'task' ? tasksLate() : badge === 'lead' ? newLeadsCount() : 0;
     const cnt = badge === 'rel' && rel ? `<span class="cnt">${rel}</span>` : late ? `<span class="cnt">${late}</span>` : badge === 'week' && !weeklyDone() ? '<span class="cnt">1</span>' : '';
     const on = route.name === k || (k === 'crm' && route.name === 'client');
     return `<a href="#/${k}" class="${on ? 'on' : ''}"><i>${ic(icon)}</i>${label}${locked ? `<span class="lock">${lvl === 2 ? 'BOUTIQUE' : 'MAGASIN'}</span>` : cnt}</a>`;
@@ -101,9 +119,11 @@ function render() {
   const v = VIEWS[route.name] || VIEWS.accueil;
   $('#view').innerHTML = v();
   if (AFTER[route.name]) AFTER[route.name]();
+  if (window.hydrateMedia) hydrateMedia();
   window.scrollTo(0, 0);
 }
-function refresh() { const y = scrollY; layout(); const v = VIEWS[route.name] || VIEWS.accueil; $('#view').innerHTML = v(); if (AFTER[route.name]) AFTER[route.name](); window.scrollTo(0, y); }
+function refresh() { const y = scrollY; layout(); const v = VIEWS[route.name] || VIEWS.accueil; $('#view').innerHTML = v(); if (AFTER[route.name]) AFTER[route.name](); if (window.hydrateMedia) hydrateMedia(); window.scrollTo(0, y); }
+function newLeadsCount() { return st ? st.clients.filter(c => c.lead && !c.leadSeen).length : 0; }
 
 function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 2200); }
 function modal(title, body, wide) {
@@ -142,8 +162,10 @@ function computeFollow() {
     if (rules.devis.on && c.status === 'devis' && since(c.lastContact) >= rules.devis.days) cand.push(['devis', since(c.lastContact)]);
     if (rules.revoir.on && (c.status === 'client' || c.status === 'fidele') && !c.next && c.history.some(h => h.amount > 0) && since(lastHist) >= rules.revoir.days) cand.push(['revoir', since(lastHist)]);
     if (rules.avis.on && c.satisfied && !c.review && since(c.lastContact) >= rules.avis.days) cand.push(['avis', since(c.lastContact)]);
+    if (rules.rappel && rules.rappel.on && c.next) { const gap = Math.round((toDate(c.next).getTime() - toDate(iso(Date.now())).getTime()) / DAY); if (gap >= 0 && gap <= Math.max(1, rules.rappel.days)) cand.push(['rappel', 0]); }
     cand.forEach(([r, d]) => {
-      if (st.done.some(x => x.cid === c.id && x.rule === r && x.date >= c.lastContact)) return;
+      if (r === 'rappel') { if (st.done.some(x => x.cid === c.id && x.rule === 'rappel' && x.ref === c.next)) return; }
+      else if (st.done.some(x => x.cid === c.id && x.rule === r && x.date >= c.lastContact)) return;
       out.push({ c, rule: r, days: d, label: rules[r].label });
     });
   });

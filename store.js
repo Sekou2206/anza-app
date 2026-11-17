@@ -169,6 +169,8 @@ async function checkRemote(silent) {
     }
     if (dirty) push();
     checkPlan(true);
+    if (window.pullLeads) pullLeads();
+    if (window.mediaSyncPending) mediaSyncPending();
   } catch (e) {}
 }
 
@@ -203,9 +205,11 @@ const AUTH_ERR = {
   'Email not confirmed': 'Confirmez d’abord votre email : le lien vous a été envoyé.',
   'Password should be at least 6 characters.': 'Le mot de passe doit faire au moins 10 caractères, avec une lettre et un chiffre.',
   'Password is known to be weak and easy to guess, please choose a different one.': 'Ce mot de passe est trop connu. Choisissez en un autre.',
+  'captcha protection: request disallowed (invalid-input-response)': 'La vérification anti robot a expiré. Recommencez.',
+  'captcha verification process failed': 'La vérification anti robot a échoué. Recommencez.',
   'Email rate limit exceeded': 'Trop de tentatives. Réessayez dans quelques minutes.'
 };
-function authErr(e) { const m = (e && e.message) || ''; return AUTH_ERR[m] || (/network|fetch/i.test(m) ? 'Connexion impossible. Vérifiez votre réseau.' : 'Une erreur est survenue. Réessayez.'); }
+function authErr(e) { const m = (e && e.message) || ''; if (/captcha/i.test(m)) return 'La vérification anti robot a échoué ou expiré. Recommencez.'; return AUTH_ERR[m] || (/network|fetch/i.test(m) ? 'Connexion impossible. Vérifiez votre réseau.' : 'Une erreur est survenue. Réessayez.'); }
 
 function authView(mode, msg, err) {
   mode = mode || 'login';
@@ -221,22 +225,84 @@ function authView(mode, msg, err) {
     ${mode !== 'reset' ? '<div class="field"><label for="a-email">Email</label><input id="a-email" type="email" autocomplete="email" required></div>' : ''}
     ${mode === 'login' ? pw('a-pw', 'current-password') : ''}${mode === 'signup' || mode === 'reset' ? pw('a-pw', 'new-password') + '<small class="mute">10 caractères minimum, avec au moins une lettre et un chiffre.</small>' : ''}
     ${mode === 'signup' ? `<label class="row auth-consent"><input type="checkbox" id="a-ok"><span>J’accepte les <a href="${CFG.termsUrl || CFG.legalUrl}" target="_blank" rel="noopener">conditions</a> et la <a href="${CFG.privacyUrl}" target="_blank" rel="noopener">politique de confidentialité</a>.</span></label>` : ''}
+    ${CFG.turnstileSiteKey && mode !== 'reset' ? '<div id="cf-box" class="cf-box"></div>' : ''}
     <button class="btn pri" type="submit" style="height:46px">${{ login: 'Se connecter', signup: 'Créer mon compte', forgot: 'Recevoir le lien', reset: 'Enregistrer' }[mode]}</button>
   </form>
   ${mode === 'login' ? '<button class="btn ghost" data-a="authMode" data-m="forgot">Mot de passe oublié ?</button>' : ''}
   ${mode === 'forgot' ? '<button class="btn ghost" data-a="authMode" data-m="login">Retour à la connexion</button>' : ''}
   <p class="auth-foot">Un projet SAUTI et SC Project · <a href="mailto:${CFG.contactEmail}">${CFG.contactEmail}</a></p></div>`;
   const f = $('#auth input'); if (f) f.focus();
+  if (CFG.turnstileSiteKey && mode !== 'reset') mountCaptcha();
 }
 A.authMode = el => authView(el.dataset.m);
+
+let captchaToken = '', cfLoading = null;
+function loadTurnstile() {
+  if (window.turnstile) return Promise.resolve();
+  if (!cfLoading) cfLoading = new Promise((ok, ko) => { const sc = document.createElement('script'); sc.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'; sc.async = true; sc.onload = ok; sc.onerror = ko; document.head.appendChild(sc); });
+  return cfLoading;
+}
+function mountCaptcha() {
+  captchaToken = '';
+  loadTurnstile().then(() => {
+    const box = $('#cf-box'); if (!box || box.dataset.on) return; box.dataset.on = '1';
+    window.turnstile.render(box, { sitekey: CFG.turnstileSiteKey, language: 'fr', theme: 'light', callback: t => { captchaToken = t; }, 'expired-callback': () => { captchaToken = ''; }, 'error-callback': () => { captchaToken = ''; } });
+  }).catch(() => { const box = $('#cf-box'); if (box) box.innerHTML = '<small class="mute">La vérification anti robot n’a pas pu se charger. Vérifiez votre connexion puis rechargez la page.</small>'; });
+}
+function captchaOpts() { return CFG.turnstileSiteKey ? { captchaToken } : {}; }
+
+let mfaFactor = null;
+async function needsMfa() {
+  try {
+    const { data } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (!data || data.nextLevel !== 'aal2' || data.currentLevel === 'aal2') return false;
+    const f = await sb.auth.mfa.listFactors();
+    mfaFactor = ((f.data && f.data.totp) || []).find(x => x.status === 'verified') || null;
+    return !!mfaFactor;
+  } catch (e) { return false; }
+}
+function mfaView(err) {
+  document.body.className = 'auth-on';
+  $('#auth').innerHTML = `<div class="auth-card">
+  <div class="auth-logo">${LOGO}<span>anza</span></div><h1>Code de sécurité</h1>
+  <p class="mute" style="font-size:15px;line-height:1.55">Ouvrez votre application d’authentification et entrez le code à 6 chiffres affiché pour Anza.</p>
+  ${err ? `<div class="auth-err" role="alert">${err}</div>` : ''}
+  <form class="form" data-form="mfa" novalidate><div class="field"><label for="a-otp">Code</label><input id="a-otp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]*" required></div>
+  <button class="btn pri" type="submit" style="height:46px">Valider</button></form>
+  <button class="btn ghost" data-a="pendingOut">Annuler et se déconnecter</button></div>`;
+  const i = $('#a-otp'); if (i) i.focus();
+}
+async function mfaSubmit() {
+  const code = (val('a-otp') || '').replace(/\D/g, '');
+  if (code.length !== 6) return mfaView('Le code contient 6 chiffres.');
+  const { error } = await sb.auth.mfa.challengeAndVerify({ factorId: mfaFactor.id, code });
+  if (error) return mfaView('Code incorrect ou expiré. Réessayez avec le nouveau code.');
+  const { data } = await sb.auth.getUser(); user = data.user || user;
+  await enterApp(true);
+}
+async function mfaStatus() {
+  const f = await sb.auth.mfa.listFactors(); if (f.error) throw f.error;
+  return ((f.data && f.data.totp) || []).find(x => x.status === 'verified') || null;
+}
+async function mfaEnroll() {
+  const f = await sb.auth.mfa.listFactors();
+  for (const x of ((f.data && f.data.all) || []).filter(x => x.status !== 'verified')) await sb.auth.mfa.unenroll({ factorId: x.id });
+  const { data, error } = await sb.auth.mfa.enroll({ factorType: 'totp', friendlyName: 'Anza ' + new Date().toISOString().slice(0, 10) });
+  if (error) throw error;
+  return data;
+}
+async function mfaConfirm(factorId, code) { const { error } = await sb.auth.mfa.challengeAndVerify({ factorId, code }); if (error) throw error; }
+async function mfaRemove(factorId) { const { error } = await sb.auth.mfa.unenroll({ factorId }); if (error) throw error; await sb.auth.refreshSession(); }
 
 document.addEventListener('submit', async e => {
   const f = e.target.closest('[data-form]'); if (!f) return;
   e.preventDefault();
   const mode = f.dataset.form, btn = $('button[type=submit]', f);
+  if (mode === 'mfa') { btn.disabled = true; btn.textContent = 'Vérification'; try { await mfaSubmit(); } catch (x) { mfaView('Vérification impossible. Vérifiez votre connexion.'); } return; }
   const email = (val('a-email') || '').trim(), first = (val('a-first') || '').trim();
   let pwv = val('a-pw');
   wipeAuth(false);
+  if (CFG.turnstileSiteKey && mode !== 'reset' && !captchaToken) { pwv = ''; return authView(mode, '', 'Cochez la vérification anti robot avant de continuer.'); }
   if (mode !== 'reset' && !/^\S+@\S+\.\S+$/.test(email)) return authView(mode, '', 'Entrez une adresse email valide.');
   if ((mode === 'signup' || mode === 'reset') && !strongPw(pwv)) { pwv = ''; return authView(mode, '', 'Choisissez un mot de passe d’au moins 10 caractères, avec au moins une lettre et un chiffre.'); }
   if (mode === 'signup' && !first) return authView(mode, '', 'Entrez votre prénom.');
@@ -245,16 +311,16 @@ document.addEventListener('submit', async e => {
   try {
     const back = location.origin + location.pathname;
     if (mode === 'login') {
-      const { data, error } = await sb.auth.signInWithPassword({ email, password: pwv });
+      const { data, error } = await sb.auth.signInWithPassword({ email, password: pwv, options: captchaOpts() });
       if (error) throw error;
       user = data.user; await enterApp();
     } else if (mode === 'signup') {
-      const { data, error } = await sb.auth.signUp({ email, password: pwv, options: { data: { first_name: first }, emailRedirectTo: back } });
+      const { data, error } = await sb.auth.signUp({ email, password: pwv, options: Object.assign({ data: { first_name: first }, emailRedirectTo: back }, captchaOpts()) });
       if (error) throw error;
       if (data.session) { user = data.user; await enterApp(); }
       else authView('login', `Presque fini ! Un email de confirmation vient d’être envoyé à <b>${esc(email)}</b>. Cliquez sur le lien, puis connectez vous.`);
     } else if (mode === 'forgot') {
-      const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: back });
+      const { error } = await sb.auth.resetPasswordForEmail(email, Object.assign({ redirectTo: back }, captchaOpts()));
       if (error) throw error;
       authView('login', 'Si un compte existe avec cet email, vous allez recevoir un lien pour choisir un nouveau mot de passe.');
     } else if (mode === 'reset') {
@@ -267,7 +333,8 @@ document.addEventListener('submit', async e => {
   } catch (err) { authView(mode, '', authErr(err)); }
 });
 
-async function enterApp() {
+async function enterApp(mfaDone) {
+  if (ONLINE && !mfaDone && await needsMfa()) { mfaView(); return; }
   await loadRemote();
   startApp();
 }
@@ -325,6 +392,8 @@ function startApp() {
   booted = true;
   if (!st.onboarded && !/^#\/bienvenue/.test(location.hash)) location.hash = '#/bienvenue';
   render();
+  if (window.mediaSyncPending) mediaSyncPending();
+  if (window.pullLeads) setTimeout(pullLeads, 1500);
   if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 
@@ -334,6 +403,7 @@ async function signOut() {
     return;
   }
   try { localStorage.removeItem(cacheKey()); localStorage.removeItem(keyStore()); } catch (e) {}
+  if (window.clearLocalMedia) await clearLocalMedia();
   if (ONLINE) await sb.auth.signOut();
   clearInterval(pendingTimer); plan = 'attente';
   user = null; st = null; booted = false; base = null; remoteAt = null; dirty = false;

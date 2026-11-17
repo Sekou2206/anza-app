@@ -104,6 +104,10 @@ Deno.serve(async (req) => {
     if (!user) return json({ error: "auth" }, 401);
 
     const admin = createClient(url, service, { auth: { persistSession: false } });
+    let aal = "";
+    try { aal = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))).aal ?? ""; } catch { aal = ""; }
+    const { data: mfaOk } = await admin.rpc("mfa_ok_for", { uid: user.id, aal });
+    if (mfaOk === false) return json({ error: "mfa" }, 403);
     const { data: row } = await admin.from("anza_state").select("plan").eq("user_id", user.id).maybeSingle();
     const allowed = (Deno.env.get("NIA_PLANS") ?? "magasin").split(",").map((s) => s.trim());
     if (!row || !allowed.includes(row.plan)) return json({ error: "plan" }, 403);

@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.anthropic.com; frame-src 'self' blob: data:; worker-src 'self'; manifest-src 'self'; media-src 'self' blob: data:; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.anthropic.com https://challenges.cloudflare.com; frame-src 'self' blob: data: https://challenges.cloudflare.com; worker-src 'self'; manifest-src 'self'; media-src 'self' blob: data:; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Anza</title>
@@ -35,13 +35,22 @@
 <noscript>Anza a besoin de JavaScript pour fonctionner.</noscript>
 <script src="config.js"></script>
 <script src="supabase.js"></script>
+<script src="qrcode.js"></script>
 <script src="logo.js"></script>
 <script src="data.js"></script>
 <script src="content.js"></script>
 <script src="nia-rules.js"></script>
 <script src="core.js"></script>
 <script src="store.js"></script>
+<script src="media.js"></script>
+<script src="brand.js"></script>
+<script src="canvas.js"></script>
+<script src="page-render.js"></script>
 <script src="ai.js"></script>
 <script src="views.js"></script>
+<script src="views-studio.js"></script>
+<script src="views-brand.js"></script>
+<script src="views-page.js"></script>
+<script src="main.js"></script>
 </body>
 </html>
