@@ -557,3 +557,4 @@ small.bad,.bad{color:var(--bad)}
 .offer-lp{margin-top:0}
 .form label.row{flex-wrap:nowrap;align-items:flex-start}.form label.row input[type=checkbox]{margin-top:3px;flex:none}
 .pubbar>div:first-child{min-width:0;flex:1 1 260px}.slugrow{width:100%}
+.bootfail{position:fixed;inset:0;z-index:999;background:#F6F8FC;display:grid;place-items:center;text-align:center;padding:24px;font-family:Inter,system-ui,sans-serif}.bootfail[hidden]{display:none}.bootfail p{margin:8px 0 16px;color:#5A6680}.bootfail button{background:#1E3A8A;color:#fff;border:0;border-radius:12px;padding:12px 22px;font-weight:700;font-size:15px}
