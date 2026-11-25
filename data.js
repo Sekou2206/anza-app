@@ -45,7 +45,9 @@ function blankState(first, email) {
     voice: { samples: [], fiche: null, at: '', ai: false },
     page: blankPage(),
     tagHist: [],
-    leadsSeen: []
+    leadsSeen: [],
+    notes: [],
+    activity: []
   };
 }
 
@@ -99,6 +101,9 @@ function migrate(o) {
   out.tagHist = out.tagHist.slice(-12);
   out.clients.forEach(c => { if (c.nextTime && !/^\d{2}:\d{2}$/.test(c.nextTime)) c.nextTime = ''; if (c.persona) c.persona = cleanId(c.persona); });
   out.quotes.forEach(q => { q.deposit = Math.max(0, Math.min(100, +q.deposit || 0)); q.depositPaid = !!q.depositPaid; });
-  out.v = 3;
+  const NCAT = ['idee', 'memo', 'client', 'contenu', 'afaire'];
+  out.notes = (Array.isArray(o.notes) ? o.notes : []).filter(n => n && n.id).map(n => ({ id: cleanId(n.id), title: String(n.title || '').slice(0, 120), body: String(n.body || '').slice(0, 12000), cat: NCAT.includes(n.cat) ? n.cat : 'memo', pin: !!n.pin, clientId: cleanId(n.clientId || ''), by: String(n.by || '').slice(0, 60), at: n.at || new Date().toISOString(), upd: n.upd || n.at || new Date().toISOString(), updBy: String(n.updBy || n.by || '').slice(0, 60) })).slice(0, 1000);
+  out.activity = (Array.isArray(o.activity) ? o.activity : []).filter(a => a && a.id && a.text).map(a => ({ id: cleanId(a.id), at: a.at || new Date().toISOString(), by: String(a.by || '').slice(0, 60), text: String(a.text).slice(0, 160), h: String(a.h || '').slice(0, 80) })).slice(0, 150);
+  out.v = 4;
   return out;
 }

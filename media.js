@@ -21,10 +21,10 @@ const idbGet = k => idb('readonly', s => s.get(k));
 const idbPut = (k, v) => idb('readwrite', s => s.put(v, k));
 const idbDel = k => idb('readwrite', s => s.delete(k));
 
-function mediaOwner() { return ONLINE && user ? user.id : 'local'; }
+function mediaOwner() { return ONLINE && user ? wsId() : 'local'; }
 function mediaKey(id) { return mediaOwner() + '/' + id; }
 function mediaMeta(id) { return st && st.media.find(m => m.id === id); }
-function mediaPath(m) { return user.id + '/' + m.id + '.' + m.ext; }
+function mediaPath(m) { return wsId() + '/' + m.id + '.' + m.ext; }
 
 async function mediaBlob(id) {
   let b = null;
@@ -149,7 +149,7 @@ async function removeMedia(ids) {
   save();
 }
 async function removeAllMediaRemote() {
-  if (!(ONLINE && user)) return;
+  if (!(ONLINE && user) || wsId() !== user.id) return;
   for (const b of [MEDIA_BUCKET, PAGE_BUCKET]) {
     for (let i = 0; i < 20; i++) {
       const { data } = await sb.storage.from(b).list(user.id, { limit: 100 });

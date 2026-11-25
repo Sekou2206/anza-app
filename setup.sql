@@ -342,3 +342,168 @@ grant insert (page_slug, kind, name, contact, message, wish_date, wish_time) on 
 grant select on public.page_leads to authenticated;
 grant update (imported) on public.page_leads to authenticated;
 grant delete on public.page_leads to authenticated;
+
+create table if not exists public.team_members (
+  id bigint generated always as identity primary key,
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  email text not null check (email = lower(email) and char_length(email) between 5 and 160),
+  user_id uuid references auth.users(id) on delete set null,
+  name text not null default '' check (char_length(name) <= 60),
+  role text not null default 'membre' check (role in ('admin', 'membre', 'lecture')),
+  created_at timestamptz not null default now()
+);
+create unique index if not exists team_members_email_idx on public.team_members(email);
+create index if not exists team_members_owner_idx on public.team_members(owner_id, created_at);
+create index if not exists team_members_user_idx on public.team_members(user_id);
+
+create or replace function public.seat_limit(p text)
+returns int language sql immutable set search_path = public as $$
+  select case p when 'stand' then 1 when 'boutique' then 3 when 'magasin' then 100000 else 0 end;
+$$;
+
+create or replace function public.ws_role(ws uuid)
+returns text language sql stable security definer set search_path = public as $$
+  select case
+    when auth.uid() is null or ws is null then null
+    when auth.uid() = ws then 'owner'
+    else (select x.role from (
+            select m.user_id, m.role, row_number() over (order by m.created_at, m.id) as rn
+            from public.team_members m where m.owner_id = ws) x
+          join public.anza_state s on s.user_id = ws
+          where x.user_id = auth.uid() and x.rn <= public.seat_limit(s.plan) - 1
+          limit 1)
+  end;
+$$;
+
+create or replace function public.ws_can(ws uuid, need_write boolean)
+returns boolean language sql stable security definer set search_path = public as $$
+  select coalesce(r in ('owner', 'admin', 'membre') or (not need_write and r = 'lecture'), false)
+  from (select public.ws_role(ws) as r) t;
+$$;
+
+create or replace function public.ws_can_text(ws text, need_write boolean)
+returns boolean language sql stable security definer set search_path = public as $$
+  select case when ws ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then public.ws_can(ws::uuid, need_write) else false end;
+$$;
+
+create or replace function public.ws_paid(ws text)
+returns boolean language sql stable security definer set search_path = public as $$
+  select case when ws ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    then exists (select 1 from public.anza_state s where s.user_id = ws::uuid and s.plan in ('stand', 'boutique', 'magasin'))
+    else false end;
+$$;
+
+create or replace function public.ws_admin(ws uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select coalesce(public.ws_role(ws) in ('owner', 'admin'), false);
+$$;
+
+revoke all on function public.seat_limit(text) from public, anon;
+revoke all on function public.ws_role(uuid) from public, anon;
+revoke all on function public.ws_can(uuid, boolean) from public, anon;
+revoke all on function public.ws_can_text(text, boolean) from public, anon;
+revoke all on function public.ws_paid(text) from public, anon;
+revoke all on function public.ws_admin(uuid) from public, anon;
+grant execute on function public.seat_limit(text) to authenticated;
+grant execute on function public.ws_role(uuid) to authenticated;
+grant execute on function public.ws_can(uuid, boolean) to authenticated;
+grant execute on function public.ws_can_text(text, boolean) to authenticated;
+grant execute on function public.ws_paid(text) to authenticated;
+grant execute on function public.ws_admin(uuid) to authenticated;
+
+create or replace function public.team_members_guard()
+returns trigger language plpgsql security definer set search_path = public, auth as $$
+declare p text; owner_mail text;
+begin
+  if tg_op = 'INSERT' then
+    new.email := lower(trim(new.email));
+    new.created_at := now();
+    if new.email !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then raise exception 'bad email'; end if;
+    select lower(u.email) into owner_mail from auth.users u where u.id = new.owner_id;
+    if new.email = owner_mail then raise exception 'own email'; end if;
+    select s.plan into p from public.anza_state s where s.user_id = new.owner_id;
+    if (select count(*) from public.team_members t where t.owner_id = new.owner_id) + 1 >= public.seat_limit(p) then raise exception 'seat limit'; end if;
+    select u.id into new.user_id from auth.users u where lower(u.email) = new.email limit 1;
+  end if;
+  new.name := left(trim(coalesce(new.name, '')), 60);
+  return new;
+end $$;
+revoke all on function public.team_members_guard() from public, anon, authenticated;
+drop trigger if exists team_members_guard on public.team_members;
+create trigger team_members_guard before insert or update on public.team_members for each row execute function public.team_members_guard();
+
+alter table public.team_members enable row level security;
+drop policy if exists "team members read" on public.team_members;
+drop policy if exists "team members insert" on public.team_members;
+drop policy if exists "team members update" on public.team_members;
+drop policy if exists "team members delete" on public.team_members;
+drop policy if exists "mfa team members" on public.team_members;
+create policy "team members read" on public.team_members for select to authenticated using (owner_id = auth.uid() or user_id = auth.uid() or public.ws_role(owner_id) is not null);
+create policy "team members insert" on public.team_members for insert to authenticated with check (owner_id = auth.uid());
+create policy "team members update" on public.team_members for update to authenticated using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy "team members delete" on public.team_members for delete to authenticated using (owner_id = auth.uid() or user_id = auth.uid());
+create policy "mfa team members" on public.team_members as restrictive for all to authenticated using (public.mfa_ok()) with check (public.mfa_ok());
+revoke all on public.team_members from anon, authenticated;
+grant select, delete on public.team_members to authenticated;
+grant insert (owner_id, email, name, role) on public.team_members to authenticated;
+grant update (name, role) on public.team_members to authenticated;
+
+create or replace function public.my_workspace()
+returns table (ws_id uuid, ws_role text, ws_plan text, ws_me text, ws_seats int, ws_used int)
+language plpgsql security definer set search_path = public, auth as $$
+declare me uuid := auth.uid(); em text; own_plan text; r record;
+begin
+  if me is null then raise exception 'not authenticated'; end if;
+  select lower(u.email) into em from auth.users u where u.id = me;
+  update public.team_members t set user_id = me where t.email = em and t.user_id is null;
+  select s.plan into own_plan from public.anza_state s where s.user_id = me;
+  if coalesce(own_plan, 'attente') = 'attente' then
+    for r in select t.owner_id, t.name from public.team_members t where t.user_id = me loop
+      if public.ws_role(r.owner_id) is not null then
+        return query select r.owner_id, public.ws_role(r.owner_id), s.plan, r.name::text, public.seat_limit(s.plan),
+          (select count(*)::int + 1 from public.team_members x where x.owner_id = r.owner_id)
+          from public.anza_state s where s.user_id = r.owner_id;
+        return;
+      end if;
+    end loop;
+  end if;
+  return query select me, 'owner'::text, coalesce(own_plan, 'attente'), ''::text, public.seat_limit(coalesce(own_plan, 'attente')),
+    (select count(*)::int + 1 from public.team_members x where x.owner_id = me);
+end $$;
+revoke all on function public.my_workspace() from public, anon;
+grant execute on function public.my_workspace() to authenticated;
+
+drop policy if exists "state read own" on public.anza_state;
+drop policy if exists "state update own" on public.anza_state;
+create policy "state read own" on public.anza_state for select to authenticated using (public.ws_can(user_id, false));
+create policy "state update own" on public.anza_state for update to authenticated using (public.ws_can(user_id, true)) with check (public.ws_can(user_id, true));
+
+drop policy if exists "anza media read" on storage.objects;
+drop policy if exists "anza media insert" on storage.objects;
+drop policy if exists "anza media update" on storage.objects;
+drop policy if exists "anza media delete" on storage.objects;
+create policy "anza media read" on storage.objects for select to authenticated
+  using (bucket_id in ('media', 'pages') and public.ws_can_text((storage.foldername(name))[1], false) and public.mfa_ok());
+create policy "anza media insert" on storage.objects for insert to authenticated
+  with check (bucket_id in ('media', 'pages') and public.ws_can_text((storage.foldername(name))[1], true) and public.ws_paid((storage.foldername(name))[1]) and public.mfa_ok());
+create policy "anza media update" on storage.objects for update to authenticated
+  using (bucket_id in ('media', 'pages') and public.ws_can_text((storage.foldername(name))[1], true) and public.mfa_ok())
+  with check (bucket_id in ('media', 'pages') and public.ws_can_text((storage.foldername(name))[1], true) and public.ws_paid((storage.foldername(name))[1]) and public.mfa_ok());
+create policy "anza media delete" on storage.objects for delete to authenticated
+  using (bucket_id in ('media', 'pages') and public.ws_can_text((storage.foldername(name))[1], true) and public.mfa_ok());
+
+drop policy if exists "pages own read" on public.pages;
+drop policy if exists "pages own insert" on public.pages;
+drop policy if exists "pages own update" on public.pages;
+drop policy if exists "pages own delete" on public.pages;
+create policy "pages own read" on public.pages for select to authenticated using (published = true or public.ws_can(user_id, false));
+create policy "pages own insert" on public.pages for insert to authenticated with check (public.ws_admin(user_id) and public.ws_paid(user_id::text));
+create policy "pages own update" on public.pages for update to authenticated using (public.ws_admin(user_id)) with check (public.ws_admin(user_id) and public.ws_paid(user_id::text));
+create policy "pages own delete" on public.pages for delete to authenticated using (public.ws_admin(user_id));
+
+drop policy if exists "leads own read" on public.page_leads;
+drop policy if exists "leads own update" on public.page_leads;
+drop policy if exists "leads own delete" on public.page_leads;
+create policy "leads own read" on public.page_leads for select to authenticated using (public.ws_can(owner, false));
+create policy "leads own update" on public.page_leads for update to authenticated using (public.ws_can(owner, true)) with check (public.ws_can(owner, true));
+create policy "leads own delete" on public.page_leads for delete to authenticated using (public.ws_can(owner, true));

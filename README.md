@@ -171,3 +171,12 @@ Le guide complet, étape par étape jusqu’à la livraison au client, est dans 
 - Avec une IA connectée, les réponses de l’utilisateur et son profil sont envoyés au fournisseur (Anthropic, OpenAI, Mistral…) pour générer les textes. Mentionnez ce fournisseur comme sous traitant dans la politique de confidentialité.
 - Coût indicatif avec Claude Sonnet 5.5 : quelques centimes par action. Suivez la consommation réelle dans la console Claude et dans `ai_usage_month`.
 - Mettez à jour la politique de confidentialité du site pour l’application : hébergement des données chez Supabase (Union européenne), finalité, durée de conservation.
+
+
+## Version 18 : équipes et bloc notes
+
+1. Relancez **tout** le fichier `setup.sql` dans Supabase, SQL Editor (il est fait pour être relancé sans risque). Il ajoute la table `team_members`, la fonction `my_workspace` et met à jour les règles d’accès.
+2. Places par formule : Le Stand 1 utilisateur, La Boutique 3 (le responsable et 2 membres), Le Magasin sans limite.
+3. Le responsable ajoute ses membres dans Réglages, carte « Votre équipe ». Chaque membre crée son compte avec l’adresse ajoutée et arrive directement dans l’espace du responsable.
+4. Accès : Administrateur (tout sauf l’équipe et la suppression du compte), Membre (clients, devis, relances, contenus, notes), Lecture seule.
+5. Nouveau menu « Bloc notes » : notes par catégorie, épinglées, liées à un client, listes à cocher, signées par leur auteur.

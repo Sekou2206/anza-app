@@ -2,6 +2,19 @@ const CFG = window.ANZA_CONFIG || {};
 const ONLINE = !!(CFG.supabaseUrl && CFG.supabaseAnonKey && window.supabase && window.supabase.createClient);
 let sb = null, user = null, plan = ONLINE ? 'attente' : (CFG.defaultPlan || 'stand'), pushTimer = null, booted = false;
 let syncState = 'ok';
+let WS = null, ROLE = 'owner', MY_NAME = '', SEATS = 1, SEATS_USED = 1, roNotice = 0;
+function wsId() { return WS || (user ? user.id : null); }
+function canWrite() { return ROLE !== 'lecture'; }
+function isAdmin() { return ROLE === 'owner' || ROLE === 'admin'; }
+async function loadWorkspace() {
+  WS = user.id; ROLE = 'owner'; MY_NAME = ''; SEATS = 1; SEATS_USED = 1;
+  try {
+    const { data, error } = await sb.rpc('my_workspace');
+    if (error) throw error;
+    const w = Array.isArray(data) ? data[0] : data;
+    if (w && w.ws_id) { WS = w.ws_id; ROLE = w.ws_role || 'owner'; MY_NAME = w.ws_me || ''; SEATS = +w.ws_seats || 1; SEATS_USED = +w.ws_used || 1; if (WS !== user.id) plan = w.ws_plan || plan; }
+  } catch (e) {}
+}
 
 let base = null, remoteAt = null, dirty = false, pushing = null;
 const HIST_KEY = 'anza-hist-local', HIST_MAX = 30;
@@ -64,6 +77,11 @@ function setSync(s) {
 }
 
 function save() {
+  if (ONLINE && user && !canWrite()) {
+    if (Date.now() - roNotice > 8000) { roNotice = Date.now(); toast('Accès en lecture seule : cette modification n’est pas enregistrée'); }
+    dirty = false; pullMerge().then(() => { if (booted) refresh(); }).catch(() => {});
+    return;
+  }
   if (!ONLINE) { const c = readCache(); if (c) localSnap(c.data, false); }
   dirty = ONLINE;
   writeCache();
@@ -80,12 +98,13 @@ function push() {
 
 async function doPush() {
   if (!ONLINE || !user) return true;
+  if (!canWrite()) { dirty = false; setSync('ok'); return true; }
   if (!dirty) { setSync('ok'); return true; }
   if (!navigator.onLine) { setSync('offline'); return false; }
   try {
     for (let i = 0; i < 3; i++) {
       const snap = clone(st);
-      let q = sb.from('anza_state').update({ data: snap, updated_at: new Date().toISOString() }).eq('user_id', user.id);
+      let q = sb.from('anza_state').update({ data: snap, updated_at: new Date().toISOString() }).eq('user_id', wsId());
       if (remoteAt) q = q.eq('updated_at', remoteAt);
       const { data, error } = await q.select('updated_at');
       if (error) throw error;
@@ -109,7 +128,7 @@ async function doPush() {
 }
 
 async function pullMerge() {
-  const { data, error } = await sb.from('anza_state').select('data, plan, updated_at').eq('user_id', user.id).maybeSingle();
+  const { data, error } = await sb.from('anza_state').select('data, plan, updated_at').eq('user_id', wsId()).maybeSingle();
   if (error) throw error;
   if (!data) throw new Error('missing');
   const remote = data.data && Object.keys(data.data).length ? migrate(clone(data.data)) : null;
@@ -122,20 +141,23 @@ async function pullMerge() {
 }
 
 async function loadRemote() {
+  await loadWorkspace();
   const meta = user.user_metadata || {};
   const fresh = () => blankState(meta.first_name || '', user.email);
   const cache = readCache();
   try {
-    const { data, error } = await sb.from('anza_state').select('data, plan, updated_at').eq('user_id', user.id).maybeSingle();
+    const { data, error } = await sb.from('anza_state').select('data, plan, updated_at').eq('user_id', wsId()).maybeSingle();
     if (error) throw error;
     if (data) {
-      plan = data.plan || 'attente';
+      if (wsId() === user.id) plan = data.plan || 'attente';
       const remote = data.data && Object.keys(data.data).length ? migrate(clone(data.data)) : null;
       remoteAt = data.updated_at; base = remote;
       if (cache && cache.dirty && cache.data) {
         st = migrate(clone(remote && cache.base ? merge3(cache.base, cache.data, remote) : cache.data));
         dirty = !same(st, remote);
       } else { st = remote ? clone(remote) : fresh(); dirty = !remote; }
+    } else if (wsId() !== user.id) {
+      throw new Error('workspace');
     } else {
       st = fresh();
       const ins = await sb.from('anza_state').insert({ user_id: user.id, data: st }).select('updated_at');
@@ -160,7 +182,7 @@ function loadLocal() {
 async function checkRemote(silent) {
   if (!ONLINE || !user || !st || pushing || !navigator.onLine) return;
   try {
-    const { data } = await sb.from('anza_state').select('updated_at').eq('user_id', user.id).maybeSingle();
+    const { data } = await sb.from('anza_state').select('updated_at').eq('user_id', wsId()).maybeSingle();
     if (!data) return;
     if (data.updated_at !== remoteAt) {
       const before = JSON.stringify(st);
@@ -230,7 +252,7 @@ function authView(mode, msg, err) {
   </form>
   ${mode === 'login' ? '<button class="btn ghost" data-a="authMode" data-m="forgot">Mot de passe oublié ?</button>' : ''}
   ${mode === 'forgot' ? '<button class="btn ghost" data-a="authMode" data-m="login">Retour à la connexion</button>' : ''}
-  <p class="auth-foot">Un projet SAUTI et SC Project · <a href="mailto:${CFG.contactEmail}">${CFG.contactEmail}</a></p></div>`;
+  <p class="auth-foot"><a href="mailto:${CFG.contactEmail}">${CFG.contactEmail}</a></p></div>`;
   const f = $('#auth input'); if (f) f.focus();
   if (CFG.turnstileSiteKey && mode !== 'reset') mountCaptcha();
 }
@@ -359,6 +381,10 @@ function pendingView(msg) {
 }
 
 async function fetchPlan() {
+  const before = wsId();
+  await loadWorkspace();
+  if (wsId() !== before && booted) { await loadRemote(); }
+  if (wsId() !== user.id) return plan;
   const { data, error } = await sb.from('anza_state').select('plan').eq('user_id', user.id).maybeSingle();
   if (error) throw error;
   return data ? data.plan : null;
@@ -405,7 +431,7 @@ async function signOut() {
   try { localStorage.removeItem(cacheKey()); localStorage.removeItem(keyStore()); } catch (e) {}
   if (window.clearLocalMedia) await clearLocalMedia();
   if (ONLINE) await sb.auth.signOut();
-  clearInterval(pendingTimer); plan = 'attente';
+  clearInterval(pendingTimer); plan = 'attente'; WS = null; ROLE = 'owner'; MY_NAME = '';
   user = null; st = null; booted = false; base = null; remoteAt = null; dirty = false;
   if (ONLINE) authView('login', 'Vous êtes déconnecté.'); else location.reload();
 }

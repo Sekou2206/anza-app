@@ -559,3 +559,32 @@ small.bad,.bad{color:var(--bad)}
 .pubbar>div:first-child{min-width:0;flex:1 1 260px}.slugrow{width:100%}
 .bootfail{position:fixed;inset:0;z-index:999;background:#F6F8FC;display:grid;place-items:center;text-align:center;padding:24px;font-family:Inter,system-ui,sans-serif}.bootfail[hidden]{display:none}.bootfail p{margin:8px 0 16px;color:#5A6680}.bootfail button{background:#1E3A8A;color:#fff;border:0;border-radius:12px;padding:12px 22px;font-weight:700;font-size:15px}
 .nett td,.nett th{white-space:nowrap}@media (max-width:560px){.nett td,.nett th{padding:10px 6px;font-size:13px}.kpi strong{overflow-wrap:anywhere}}
+
+.notes-bar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:16px}
+.notes-search{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:0 12px;flex:1;min-width:220px;max-width:420px}
+.notes-search svg{width:16px;height:16px;stroke:var(--mute);fill:none;stroke-width:2;flex:none}
+.notes-search input{border:0;outline:0;background:none;padding:10px 0;width:100%}
+.notes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.notes-grid.mini{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
+.note-card{background:#fff;border:1px solid var(--line);border-top:4px solid var(--sky);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;cursor:pointer;min-height:130px;transition:box-shadow .15s,transform .15s}
+.note-card:hover{box-shadow:0 8px 24px rgba(10,16,32,.08);transform:translateY(-1px)}
+.note-card:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.note-card.ncat-idee{border-top-color:#F2B705}.note-card.ncat-memo{border-top-color:var(--sky)}.note-card.ncat-client{border-top-color:var(--ok)}.note-card.ncat-contenu{border-top-color:#C8693C}.note-card.ncat-afaire{border-top-color:var(--navy)}
+.nc-top{display:flex;justify-content:space-between;align-items:center}
+.nc-cat{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
+.nc-pin svg{width:15px;height:15px;stroke:var(--navy);fill:var(--soft);stroke-width:1.8}
+.note-card h4{font-size:16px;letter-spacing:-.02em;line-height:1.25}
+.nc-body{font-size:14px;line-height:1.5;color:#2A3450;display:flex;flex-direction:column;gap:4px;overflow-wrap:anywhere}
+.nc-body p{margin:0}.nc-more{color:var(--mute)}
+.nc-ck{display:flex;gap:8px;align-items:flex-start;cursor:pointer}.nc-ck input{margin-top:3px;accent-color:var(--navy)}
+.nc-ck.done span{text-decoration:line-through;color:var(--mute)}
+.nc-foot{margin-top:auto;display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+.nc-foot small{color:var(--mute);font-size:12px}
+.nc-client{font-size:12px;font-weight:600;color:var(--navy);text-decoration:none;background:var(--soft);padding:3px 8px;border-radius:999px}
+.empty-notes{text-align:center;padding:36px 20px}
+.team-list li{flex-wrap:wrap}
+.team-list select{border:1px solid var(--line);border-radius:8px;padding:5px 8px;background:#fff;font-size:13px}
+.team-add{margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+.roles-help{margin-top:14px;padding:12px 14px;background:var(--soft);border-radius:12px;font-size:13px;color:#2A3450;display:grid;gap:4px}
+@media (max-width:640px){.notes-grid{grid-template-columns:1fr}.notes-search{max-width:none}}
+.notes-bar .chip{text-decoration:none}

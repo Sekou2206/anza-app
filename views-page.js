@@ -126,22 +126,22 @@ async function pagePublish() {
   const d = pageData(), ids = [...new Set([d.cover, d.avatar, ...d.gallery].filter(Boolean))], paths = {};
   for (const id of ids) {
     const m = mediaMeta(id), b = await mediaBlob(id); if (!m || !b) continue;
-    const path = `${user.id}/${id}.${m.ext}`;
+    const path = `${wsId()}/${id}.${m.ext}`;
     const { error } = await sb.storage.from(PAGE_BUCKET).upload(path, b, { contentType: m.ext === 'png' ? 'image/png' : 'image/jpeg', upsert: true, cacheControl: '3600' });
     if (!error) paths[id] = path;
   }
   const pub = Object.assign({}, d, { cover: paths[d.cover] || '', avatar: paths[d.avatar] || '', gallery: d.gallery.map(id => paths[id]).filter(Boolean) });
   const row = { slug: s, published: true, data: pub, updated_at: new Date().toISOString() };
-  let r = await sb.from('pages').update(row).eq('user_id', user.id).select('slug');
-  if (!r.error && (!r.data || !r.data.length)) r = await sb.from('pages').insert(Object.assign({ user_id: user.id }, row)).select('slug');
+  let r = await sb.from('pages').update(row).eq('user_id', wsId()).select('slug');
+  if (!r.error && (!r.data || !r.data.length)) r = await sb.from('pages').insert(Object.assign({ user_id: wsId() }, row)).select('slug');
   if (r.error) { toast(/duplicate|23505|unique/i.test(r.error.message + (r.error.code || '')) ? 'Cette adresse est déjà prise, choisissez en une autre' : 'Publication impossible pour le moment, réessayez'); return false; }
-  try { const { data } = await sb.storage.from(PAGE_BUCKET).list(user.id, { limit: 100 }); const keep = new Set(Object.values(paths)); const old = (data || []).map(f => user.id + '/' + f.name).filter(p => !keep.has(p)); if (old.length) await sb.storage.from(PAGE_BUCKET).remove(old); } catch (e) {}
+  try { const { data } = await sb.storage.from(PAGE_BUCKET).list(wsId(), { limit: 100 }); const keep = new Set(Object.values(paths)); const old = (data || []).map(f => wsId() + '/' + f.name).filter(p => !keep.has(p)); if (old.length) await sb.storage.from(PAGE_BUCKET).remove(old); } catch (e) {}
   st.page.published = true; st.page.publishedAt = iso(Date.now()); st.page.pubHash = hashStr(JSON.stringify(d)); save();
   return true;
 }
 A.pagePub = async el => { el.disabled = true; const t = el.textContent; el.textContent = 'Publication'; const ok = await pagePublish(); if (ok) { toast('Votre page est en ligne'); refresh(); } else { el.disabled = false; el.textContent = t; } };
 A.pageOff = () => confirmBox('Retirer votre page d’internet ? Le lien ne fonctionnera plus jusqu’à la prochaine publication.', 'Retirer', async () => {
-  const { error } = await sb.from('pages').update({ published: false }).eq('user_id', user.id);
+  const { error } = await sb.from('pages').update({ published: false }).eq('user_id', wsId());
   if (error) { toast('Impossible pour le moment'); return; }
   st.page.published = false; save(); refresh(); toast('Page retirée');
 });
@@ -161,10 +161,10 @@ A.lpAsk = () => { st.lpAsked = iso(Date.now()); save(); setTimeout(refresh, 400)
 
 let leadsBusy = false;
 async function pullLeads() {
-  if (!ONLINE || !user || !st || !booted || leadsBusy || !navigator.onLine) return;
+  if (!ONLINE || !user || !st || !booted || leadsBusy || !navigator.onLine || !canWrite()) return;
   leadsBusy = true;
   try {
-    const { data, error } = await sb.from('page_leads').select('id, kind, name, contact, message, wish_date, wish_time, created_at').eq('imported', false).order('created_at', { ascending: true }).limit(50);
+    const { data, error } = await sb.from('page_leads').select('id, kind, name, contact, message, wish_date, wish_time, created_at').eq('owner', wsId()).eq('imported', false).order('created_at', { ascending: true }).limit(50);
     if (error || !data || !data.length) return;
     const fresh = data.filter(l => !st.leadsSeen.includes(l.id));
     fresh.forEach(l => {

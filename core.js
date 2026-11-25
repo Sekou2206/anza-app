@@ -66,12 +66,14 @@ const ICON = {
   edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/>',
   eye: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
   star: '<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>',
+  note: '<path d="M5 3h10l4 4v14H5z"/><path d="M15 3v4h4M8.5 11h7M8.5 14.5h7M8.5 18h4"/>',
+  pin: '<path d="M9 3h6l-1 6 4 3v2H6v-2l4-3z"/><path d="M12 14v7"/>',
   link: '<path d="M10 14a4.5 4.5 0 006.4 0l3-3a4.5 4.5 0 00-6.4-6.4l-1 1"/><path d="M14 10a4.5 4.5 0 00-6.4 0l-3 3a4.5 4.5 0 006.4 6.4l1-1"/>'
 };
 const ic = n => `<svg viewBox="0 0 24 24">${ICON[n]}</svg>`;
 
 const NAV = [
-  ['Piloter', [['accueil', 'Accueil', 'home'], ['net', 'Net en poche', 'coin']]],
+  ['Piloter', [['accueil', 'Accueil', 'home'], ['notes', 'Bloc notes', 'note'], ['net', 'Net en poche', 'coin']]],
   ['Vendre', [['crm', 'Clients', 'users'], ['tableau', 'Tableau', 'board', 'task'], ['relances', 'Relances', 'bell', 'rel'], ['devis', 'Devis', 'file'], ['cgv', 'Conditions de vente', 'shield', null, 2]]],
   ['Nia, brand manager', [['parler', 'Parler à Nia', 'msg', null, 3], ['nia', 'Entretien de départ', 'chat'], ['semaine', 'Question de la semaine', 'spark', 'week'], ['journal', 'Journal', 'book']]],
   ['Attirer', [['stories', 'Stories', 'story'], ['posts', 'Carrousels et posts', 'grid'], ['photos', 'Photothèque', 'image'], ['calendrier', 'Calendrier', 'cal'], ['bilan', 'Bilan du mois', 'chart']]],
