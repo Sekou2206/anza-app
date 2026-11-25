@@ -6,8 +6,9 @@ const FONTS = {
   Archivo: { label: 'Affirmée', family: 'Archivo Black', w: 400, css: "'Archivo Black', Impact, sans-serif" },
   Caveat: { label: 'Manuscrite', family: 'Caveat', w: 700, css: 'Caveat, cursive' }
 };
-function fontOf() { return FONTS[st.brand.font] || FONTS.Inter; }
-function fontFam() { return fontOf().css; }
+let FONT_SEL = '';
+function fontOf(k) { return FONTS[k] || FONTS[FONT_SEL] || FONTS[st.brand.font] || FONTS.Inter; }
+function fontFam(k) { return fontOf(k).css; }
 function titleFont(px) { const f = fontOf(); return `${f.w} ${Math.round(f.family === 'Caveat' ? px * 1.18 : px)}px ${f.css}`; }
 async function ensureFonts() {
   if (!document.fonts || !document.fonts.load) return;
@@ -64,6 +65,7 @@ function drawCard(f, i, n, o) {
     const g = x.createLinearGradient(0, H * .3, 0, H); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(.55, 'rgba(0,0,0,.45)'); g.addColorStop(1, 'rgba(0,0,0,.78)');
     x.fillStyle = g; x.fillRect(0, 0, W, H);
     const g2 = x.createLinearGradient(0, 0, 0, 320); g2.addColorStop(0, 'rgba(0,0,0,.35)'); g2.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g2; x.fillRect(0, 0, W, 320);
+    if (o.dim > 0) { x.fillStyle = `rgba(0,0,0,${Math.min(.8, o.dim)})`; x.fillRect(0, 0, W, H); }
     fg = '#FFFFFF'; areaTop = H * .42;
   } else if (lay === 'cadre') {
     const top = story ? 230 : 170, h = Math.round(H * (story ? .5 : .46));
@@ -100,7 +102,7 @@ function drawCard(f, i, n, o) {
   const lh = T.px * 1.06;
   let y = areaBot - ctaH - subH - T.lines.length * lh;
   if (lay === 'texte') y = Math.max(y, areaTop);
-  x.fillStyle = fg; if (lay === 'photo') { x.shadowColor = 'rgba(0,0,0,.35)'; x.shadowBlur = 18; }
+  x.fillStyle = o.ink || fg; if (lay === 'photo') { x.shadowColor = 'rgba(0,0,0,.35)'; x.shadowBlur = 18; }
   x.font = titleFont(T.px); T.lines.forEach(l => { y += lh; x.fillText(l, pad, y - lh * .18); });
   x.font = `500 ${subPx}px Inter, sans-serif`; x.globalAlpha = .92; y += sub.length ? 22 : 0; sub.forEach(l => { y += subLh; x.fillText(l, pad, y); });
   x.globalAlpha = 1; x.shadowBlur = 0;
@@ -108,10 +110,12 @@ function drawCard(f, i, n, o) {
   return cv.toDataURL('image/png');
 }
 async function renderSet(items, o) {
-  await ensureFonts();
+  FONT_SEL = FONTS[o.font] ? o.font : '';
+  const ef = ensureFonts(); FONT_SEL = ''; await ef;
   const logoImg = st.brand.logoOn && st.brand.logo ? await mediaImage(st.brand.logo) : null;
   const imgs = await Promise.all(items.map(f => f.img ? mediaImage(f.img) : null));
-  return items.map((f, i) => drawCard(f, i, items.length, Object.assign({}, o, { imgs, logoImg })));
+  FONT_SEL = FONTS[o.font] ? o.font : '';
+  try { return items.map((f, i) => drawCard(f, i, items.length, Object.assign({}, o, { imgs, logoImg }))); } finally { FONT_SEL = ''; }
 }
 function previewStyle(f, i, n, o) {
   const style = f.style || (o.kind === 'slide' && i > 0 && o.alt ? (i % 2 ? 'Clair' : o.style) : o.style);

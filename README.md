@@ -180,3 +180,13 @@ Le guide complet, étape par étape jusqu’à la livraison au client, est dans 
 3. Le responsable ajoute ses membres dans Réglages, carte « Votre équipe ». Chaque membre crée son compte avec l’adresse ajoutée et arrive directement dans l’espace du responsable.
 4. Accès : Administrateur (tout sauf l’équipe et la suppression du compte), Membre (clients, devis, relances, contenus, notes), Lecture seule.
 5. Nouveau menu « Bloc notes » : notes par catégorie, épinglées, liées à un client, listes à cocher, signées par leur auteur.
+
+## Version 19 : texte des stories et carrousels
+
+Dans Stories et dans Carrousels, trois nouveaux réglages :
+
+* Typographie : celle de la charte ou une autre, pour cette série seulement.
+* Couleur du texte : automatique, blanc, noir, couleurs de la marque ou une couleur au choix.
+* Assombrir la photo : de 0 à 70 %. Réglé à 35 % par défaut sur les stories pour que le texte ressorte.
+
+L’accueil propose aussi d’inviter son équipe, et les écrans de formule rappellent le nombre d’utilisateurs. Aucun changement Supabase pour cette version.

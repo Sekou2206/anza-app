@@ -201,7 +201,7 @@ C.set = I.set;
 
 function lockView(level, title, text) {
   return `<div class="lockview"><div class="card"><div class="av lg" style="margin:0 auto;background:var(--soft);color:var(--navy)">${ic(level === 2 ? 'page' : 'brain').replace('<svg', '<svg style="width:26px;height:26px;stroke:currentColor;fill:none;stroke-width:1.8"')}</div>
-  <h2>${title}</h2><p>${text}</p><div class="btns"><a class="btn pri" href="${CFG.calendly}" target="_blank" rel="noopener">Passer ${level === 2 ? 'à la Boutique' : 'au Magasin'}</a><a class="btn sec" href="${CFG.plansUrl}" target="_blank" rel="noopener">Comparer les formules</a></div></div></div>`;
+  <h2>${title}</h2><p>${text}</p><p class="mute" style="font-size:14px;margin-top:10px">${level === 2 ? 'La Boutique, c’est aussi le travail à trois : vous et 2 membres, chacun avec ses accès.' : 'Le Magasin, c’est aussi des utilisateurs illimités pour toute votre équipe.'}</p><div class="btns"><a class="btn pri" href="${CFG.calendly}" target="_blank" rel="noopener">Passer ${level === 2 ? 'à la Boutique' : 'au Magasin'}</a><a class="btn sec" href="${CFG.plansUrl}" target="_blank" rel="noopener">Comparer les formules</a></div></div></div>`;
 }
 A.logout = () => confirmBox('Se déconnecter de cet appareil ?', 'Se déconnecter', () => signOut());
 

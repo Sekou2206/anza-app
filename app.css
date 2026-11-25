@@ -588,3 +588,18 @@ small.bad,.bad{color:var(--bad)}
 .roles-help{margin-top:14px;padding:12px 14px;background:var(--soft);border-radius:12px;font-size:13px;color:#2A3450;display:grid;gap:4px}
 @media (max-width:640px){.notes-grid{grid-template-columns:1fr}.notes-search{max-width:none}}
 .notes-bar .chip{text-decoration:none}
+.frame .ft,.slide b{font-weight:var(--tw,800)}
+.frame .ftext,.slide .ftext{color:var(--ti,inherit)}
+.frame .shade,.slide .shade{background:linear-gradient(rgba(0,0,0,var(--dim,0)),rgba(0,0,0,var(--dim,0))),linear-gradient(180deg,rgba(0,0,0,.28) 0,rgba(0,0,0,0) 22%,rgba(0,0,0,0) 40%,rgba(0,0,0,.72) 100%)}
+.fontpick,.inkpick{display:flex;flex-wrap:wrap;gap:8px}
+.fontpick button{display:grid;justify-items:center;gap:2px;min-width:72px;padding:8px 10px 6px;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--night)}
+.fontpick button span{font-size:24px;line-height:1.1}
+.fontpick small,.inkpick small{font-size:11px;color:var(--mute);font-weight:600}
+.fontpick button.on,.inkpick button.on,.inkpick .inkcustom:focus-within{border-color:var(--navy);box-shadow:0 0 0 2px rgba(30,58,138,.15)}
+.inkpick button,.inkpick .inkcustom{display:grid;justify-items:center;gap:4px;padding:8px 8px 6px;min-width:62px;border:1px solid var(--line);border-radius:12px;background:#fff;cursor:pointer}
+.inkpick i{width:26px;height:26px;border-radius:50%;border:1px solid rgba(10,16,32,.15);display:block}
+.inkpick i.auto{background:linear-gradient(135deg,#fff 50%,#0A1020 50%)}
+.inkpick input[type=color]{width:28px;height:28px;padding:0;border:0;border-radius:50%;background:none;cursor:pointer}
+.dimrange{width:100%;accent-color:var(--navy)}
+.field label small{font-weight:600;color:var(--mute);margin-left:6px}
+.teamtip{display:flex;gap:14px;align-items:flex-start}.teamtip .av{flex:none}.teamtip p{margin-top:6px;font-size:14px;line-height:1.5}.teamtip .btns{margin-top:12px}

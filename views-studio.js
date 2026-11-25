@@ -38,6 +38,32 @@ function ideasRow(kind) {
   return chips.length ? `<div class="ideas"><p class="kick" style="margin:0 0 8px">Idées du moment</p>${chips.join('')}</div>` : '';
 }
 
+const HEX = /^#[0-9a-f]{6}$/i;
+function textOpts(d, kind) {
+  return { font: FONTS[d.font] ? d.font : '', ink: HEX.test(d.ink || '') ? d.ink : '', dim: typeof d.dim === 'number' && d.dim >= 0 && d.dim <= .7 ? d.dim : (kind === 'story' ? .35 : .15) };
+}
+function tileVars(d, kind) {
+  const o = textOpts(d, kind), f = fontOf(o.font);
+  return `--tf:${f.css};--tw:${f.w};--dim:${o.dim};${o.ink ? `--ti:${o.ink};` : ''}`;
+}
+function textPanel(d, k) {
+  const o = textOpts(d, k), b = st.brand, hasPhoto = (d.frames || d.slides).some(f => f.img && (f.lay || 'photo') === 'photo');
+  const inks = [['', 'Auto'], ['#FFFFFF', 'Blanc'], ['#0A1020', 'Noir'], [b.primary, 'Principale'], [b.accent, 'Accent'], [b.soft, 'Douce']].filter((x, i, a) => !x[0] || a.findIndex(y => (y[0] || '').toLowerCase() === x[0].toLowerCase()) === i);
+  return `<div class="field"><label>Typographie</label><div class="fontpick">
+      <button class="${!o.font ? 'on' : ''}" data-a="studioFont" data-k="${k}" data-v=""><span style="font-family:${fontOf(b.font).css};font-weight:${fontOf(b.font).w}">Aa</span><small>Charte</small></button>
+      ${Object.entries(FONTS).map(([key, f]) => `<button class="${o.font === key ? 'on' : ''}" data-a="studioFont" data-k="${k}" data-v="${key}"><span style="font-family:${f.css};font-weight:${f.w}">Aa</span><small>${f.label}</small></button>`).join('')}</div></div>
+    <div class="field"><label>Couleur du texte</label><div class="inkpick">
+      ${inks.map(([v, l]) => `<button class="${(o.ink || '').toLowerCase() === v.toLowerCase() ? 'on' : ''}" data-a="studioInk" data-k="${k}" data-v="${v}" title="${l}">${v ? `<i style="background:${v}"></i>` : '<i class="auto"></i>'}<small>${l}</small></button>`).join('')}
+      <label class="inkcustom" title="Autre couleur"><input type="color" value="${o.ink || '#FFFFFF'}" data-c="studioInkPick" data-k="${k}" aria-label="Choisir une autre couleur de texte"><small>Autre</small></label></div></div>
+    <div class="field"><label for="dim-${k}">Assombrir la photo <small id="dimv-${k}">${Math.round(o.dim * 100)} %</small></label><input type="range" id="dim-${k}" class="dimrange" min="0" max="70" step="5" value="${Math.round(o.dim * 100)}" data-i="studioDim" data-c="studioDimSave" data-k="${k}"><small>${hasPhoto ? 'Plus la photo est sombre, plus votre texte ressort.' : 'S’applique aux photos en plein cadre.'}</small></div>`;
+}
+function studioDraft(k) { return k === 'story' ? storyDraft() : postDraft(); }
+A.studioFont = el => { const d = studioDraft(el.dataset.k); d.font = el.dataset.v; save(); ensureFonts().then(() => document.fonts && FONTS[d.font] ? document.fonts.load(`${FONTS[d.font].w} 40px "${FONTS[d.font].family}"`) : null).then(refresh, refresh); refresh(); };
+A.studioInk = el => { const d = studioDraft(el.dataset.k); d.ink = el.dataset.v; save(); refresh(); };
+C.studioInkPick = el => { if (!HEX.test(el.value)) return; const d = studioDraft(el.dataset.k); d.ink = el.value; save(); refresh(); };
+I.studioDim = el => { const v = Math.max(0, Math.min(70, +el.value || 0)) / 100; $$(el.dataset.k === 'story' ? '.frames .frame' : '.slides .slide').forEach(n => n.style.setProperty('--dim', v)); const t = $('#dimv-' + el.dataset.k); if (t) t.textContent = Math.round(v * 100) + ' %'; };
+C.studioDimSave = el => { const d = studioDraft(el.dataset.k); d.dim = Math.max(0, Math.min(70, +el.value || 0)) / 100; save(); };
+
 VIEWS.stories = () => {
   const d = storyDraft(), q = route.q;
   if (q.type || q.subj != null) {
@@ -55,6 +81,7 @@ VIEWS.stories = () => {
     ${photoStrip(d.frames, 'story')}
     <div class="field"><label>Mise en page des photos</label><div class="seg wrap">${LAYOUTS.filter(l => l[0] !== 'texte').map(([k, l]) => `<button class="${d.lay === k ? 'on' : ''}" data-a="studioLay" data-k="story" data-v="${k}">${l}</button>`).join('')}</div></div>
     <div class="field"><label>Fond</label><div class="seg">${STYLES.map(([k, l]) => `<button class="${d.style === k ? 'on' : ''}" data-a="studioStyle" data-k="story" data-v="${k}">${l}</button>`).join('')}</div></div>
+    ${textPanel(d, 'story')}
     ${logoToggle()}
     <button class="btn pri" data-a="storyGen" ${busy ? 'disabled' : ''}>${ic('spark')}${busy ? 'Nia écrit' : aiOn() ? 'Écrire avec Nia' : 'Réécrire la séquence'}</button>
     <div class="tip"><i>N</i><div>${st.profile.value ? `Anza s’appuie sur votre promesse « ${esc(st.profile.value)} »${icpReady() ? ` et sur ${esc(primaryPersona().name)}, votre client idéal` : ''}.` : 'Faites l’entretien avec Nia pour des textes vraiment personnalisés.'}</div></div></div></div>
@@ -62,7 +89,7 @@ VIEWS.stories = () => {
 };
 function storyTile(f, i, n, d) {
   const { c, lay, fg } = frameBg(f, i, n, 'story', d);
-  return `<div class="frame lay-${lay}" style="background:${c.bg};color:${fg};--tf:${fontFam()}">${photoTag(f.img, f.pos)}${lay === 'photo' ? '<i class="shade"></i>' : ''}
+  return `<div class="frame lay-${lay}" style="background:${c.bg};color:${fg};${tileVars(d, 'story')}">${photoTag(f.img, f.pos)}${lay === 'photo' ? '<i class="shade"></i>' : ''}
     <div class="bars2">${d.frames.map((x, k) => `<i class="${k <= i ? 'on' : ''}"></i>`).join('')}</div><p class="who">${logoBadge()}${esc(P().handle)}</p><span class="num">${i + 1}</span>
     <div class="ftext"><p class="ft" contenteditable="true" data-i="frameText" data-k="story" data-n="${i}" data-f="t">${esc(f.t)}</p>${f.s || lay === 'texte' ? `<p class="fs" contenteditable="true" data-i="frameText" data-k="story" data-n="${i}" data-f="s">${esc(f.s)}</p>` : ''}</div>${f.c ? `<p class="fc" style="background:${lay === 'photo' ? st.brand.accent : c.cb};color:${lay === 'photo' ? readableOn(st.brand.accent) : c.cf}">${esc(f.c)}</p>` : ''}
     <div class="ftools"><button data-a="frameOpen" data-k="story" data-n="${i}" aria-label="Modifier la story ${i + 1}">${ic('edit')}</button><button data-a="framePhoto" data-k="story" data-n="${i}" aria-label="Photo de la story ${i + 1}">${ic('image')}</button></div></div>`;
@@ -171,6 +198,7 @@ VIEWS.posts = () => {
     ${photoStrip(d.slides, 'post')}
     <div class="field"><label>Mise en page des photos</label><div class="seg wrap">${LAYOUTS.filter(l => l[0] !== 'texte').map(([k, l]) => `<button class="${d.lay === k ? 'on' : ''}" data-a="studioLay" data-k="post" data-v="${k}">${l}</button>`).join('')}</div></div>
     <div class="field"><label>Fond</label><div class="seg">${STYLES.map(([k, l]) => `<button class="${d.style === k ? 'on' : ''}" data-a="studioStyle" data-k="post" data-v="${k}">${l}</button>`).join('')}</div></div>
+    ${textPanel(d, 'post')}
     <label class="row"><input type="checkbox" ${d.alt ? 'checked' : ''} data-c="pAlt"> Alterner les fonds d’une slide à l’autre</label>
     ${logoToggle()}
     <button class="btn pri" data-a="pGen" ${busy ? 'disabled' : ''}>${ic('spark')}${busy ? 'Nia écrit' : aiOn() ? 'Écrire avec Nia' : 'Réécrire'}</button>
@@ -183,7 +211,7 @@ VIEWS.posts = () => {
 };
 function slideTile(f, i, n, d) {
   const { c, lay, fg } = frameBg(f, i, n, 'slide', d);
-  return `<div class="slide lay-${lay}" style="background:${c.bg};color:${fg};--tf:${fontFam()}">${photoTag(f.img, f.pos)}${lay === 'photo' ? '<i class="shade"></i>' : ''}<small>${esc(f.k)}</small>${i === 0 && st.brand.logo && st.brand.logoOn && lay !== 'moitie' ? `<span class="slogo">${logoBadge()}</span>` : ''}
+  return `<div class="slide lay-${lay}" style="background:${c.bg};color:${fg};${tileVars(d, 'post')}">${photoTag(f.img, f.pos)}${lay === 'photo' ? '<i class="shade"></i>' : ''}<small>${esc(f.k)}</small>${i === 0 && st.brand.logo && st.brand.logoOn && lay !== 'moitie' ? `<span class="slogo">${logoBadge()}</span>` : ''}
     <div class="ftext"><b contenteditable="true" data-i="frameText" data-k="post" data-n="${i}" data-f="t">${esc(f.t)}</b><p contenteditable="true" data-i="frameText" data-k="post" data-n="${i}" data-f="p">${esc(f.p)}</p></div>
     <div class="ftools"><button data-a="frameOpen" data-k="post" data-n="${i}" aria-label="Modifier la slide ${i + 1}">${ic('edit')}</button><button data-a="framePhoto" data-k="post" data-n="${i}" aria-label="Photo de la slide ${i + 1}">${ic('image')}</button></div></div>`;
 }
@@ -218,13 +246,13 @@ A.tagAdd = () => { const d = postDraft(), t = '#' + slug(val('tagnew')); if (t.l
 A.postCal = () => { const d = postDraft(); planModal(d.net === 'LinkedIn' ? 'LinkedIn' : d.format === 'Carrousel' ? 'Carrousel' : 'Story', d.angle, (d.net === 'LinkedIn' ? 'Post LinkedIn, ' : 'Carrousel, ') + d.slides[0].t); };
 
 function studioPack(k) {
-  if (k === 'story') { const d = storyDraft(); return { kind: 'story', items: d.frames, style: d.style, base: `story-${slug(d.type)}`, caption: '', net: 'Instagram', title: d.frames[0] && d.frames[0].t }; }
+  if (k === 'story') { const d = storyDraft(); return Object.assign(textOpts(d, 'story'), { kind: 'story', items: d.frames, style: d.style, base: `story-${slug(d.type)}`, caption: '', net: 'Instagram', title: d.frames[0] && d.frames[0].t }); }
   const d = postDraft();
-  return { kind: 'slide', items: d.format === 'Post' ? d.slides.slice(0, 1) : d.slides, style: d.style, alt: d.alt, ratio: d.ratio, base: `${slug(d.net)}-${slug(d.angle)}`, caption: d.caption, tags: d.tags, net: d.net, title: d.slides[0] && d.slides[0].t, angle: d.angle, format: d.format };
+  return Object.assign(textOpts(d, 'post'), { kind: 'slide', items: d.format === 'Post' ? d.slides.slice(0, 1) : d.slides, style: d.style, alt: d.alt, ratio: d.ratio, base: `${slug(d.net)}-${slug(d.angle)}`, caption: d.caption, tags: d.tags, net: d.net, title: d.slides[0] && d.slides[0].t, angle: d.angle, format: d.format });
 }
 async function packImages(pk) {
   const dims = pk.kind === 'story' ? { W: 1080, H: 1920 } : { W: 1080, H: pk.ratio === '11' ? 1080 : 1350 };
-  return renderSet(pk.items, Object.assign({ kind: pk.kind, style: pk.style, alt: pk.alt, handle: P().handle }, dims));
+  return renderSet(pk.items, Object.assign({ kind: pk.kind, style: pk.style, alt: pk.alt, handle: P().handle, font: pk.font, ink: pk.ink, dim: pk.dim }, dims));
 }
 A.studioDl = async el => {
   const pk = studioPack(el.dataset.k); el.disabled = true;

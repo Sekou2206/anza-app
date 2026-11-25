@@ -180,6 +180,8 @@ C.noteCk = el => {
     const h = home(), extra = [];
     const pinned = st.notes.filter(n => n.pin).slice(0, 3);
     if (pinned.length) extra.push(`<div class="card" style="margin-top:16px"><h3>Notes épinglées <a class="btn ghost sm" href="#/notes">Bloc notes</a></h3><div class="notes-grid mini" style="margin-top:10px">${pinned.map(noteCard).join('')}</div></div>`);
+    const tip = teamInvite();
+    if (tip) extra.push(tip);
     const acts = (st.activity || []).slice(0, 6);
     if (teamMode() && acts.length) extra.push(`<div class="card" style="margin-top:16px"><h3>Activité de l’équipe</h3><ul class="list" style="margin-top:8px">${acts.map(a => `<li><div class="av">${initials(a.by)}</div><div class="grow"><b>${esc(a.by)}</b> <span>${esc(a.text)}</span><small style="display:block">${ago(a.at)}</small></div>${a.h ? `<a class="btn ghost sm" href="${esc(a.h)}">Voir</a>` : ''}</li>`).join('')}</ul></div>`);
     if (!extra.length) return h;
@@ -280,3 +282,12 @@ A.teamLeave = () => confirmBox('Quitter cette équipe ? Vous n’aurez plus acc�
   try { localStorage.removeItem(cacheKey()); } catch (e) {}
   booted = false; await loadRemote(); startApp();
 });
+
+function teamInvite() {
+  if (!ONLINE || !user || ROLE !== 'owner' || st.teamTipOff || SEATS_USED > 1) return '';
+  const icon = `<div class="av" style="background:var(--soft);color:var(--navy)">${ic('team')}</div>`;
+  if (plan === 'stand') return `<div class="card teamtip" style="margin-top:16px">${icon}<div class="grow"><h3>Vous travaillez à plusieurs ?</h3><p class="mute">Le Stand est pensé pour une personne. Avec la Boutique, vous êtes 3 : vous et 2 membres, chacun avec son email, son prénom et ses accès. Avec le Magasin, toute votre équipe, sans limite.</p><div class="btns"><a class="btn sec sm" href="${CFG.plansUrl}" target="_blank" rel="noopener">Voir les formules</a><button class="btn ghost sm" data-a="teamTipOff">Plus tard</button></div></div></div>`;
+  const left = plan === 'magasin' ? 'autant de personnes que vous voulez' : '2 personnes';
+  return `<div class="card teamtip" style="margin-top:16px">${icon}<div class="grow"><h3>Invitez votre équipe</h3><p class="mute">Votre ${PLAN_NAME[plan].replace(/^L[ae] /, '')} inclut ${left} en plus de vous. Chacun se connecte avec son propre email et travaille dans votre espace : mêmes clients, mêmes devis, mêmes notes. Vous choisissez ce que chacun peut faire, et chaque action est signée de son prénom.</p><div class="btns"><a class="btn pri sm" href="#/reglages">${ic('plus')}Ajouter une personne</a><button class="btn ghost sm" data-a="teamTipOff">Plus tard</button></div></div></div>`;
+}
+A.teamTipOff = () => { st.teamTipOff = true; save(); refresh(); };
